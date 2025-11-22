@@ -30,6 +30,11 @@
       <artifactId>java-dotenv</artifactId>
       <version>5.2.2</version>
     </dependency>
+    <dependency>
+        <groupId>info.picocli</groupId>
+        <artifactId>picocli</artifactId>
+        <version>4.7.7</version>
+    </dependency>
   </dependencies>
 
   <build>

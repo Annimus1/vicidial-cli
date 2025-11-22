@@ -6,7 +6,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.ArrayList;
 import io.github.cdimascio.dotenv.Dotenv;
 
 public class VicidialClient{
@@ -58,11 +57,11 @@ public class VicidialClient{
     
     /**
      * Realiza una petición GET SÍNCRONA para obtener todas las campañas.
-     * * @return El cuerpo de la respuesta de la API (JSON/XML) como String.
+     * @return El cuerpo de la respuesta de la API (JSON/XML) como String.
      * @throws IOException Si ocurre un error de entrada/salida (red).
      * @throws InterruptedException Si el hilo es interrumpido durante la espera.
      */
-    public String getCampaignsSync() throws IOException, InterruptedException {
+    public String getCampaigns() throws IOException, InterruptedException {
         String url = buildApiUrl("campaigns_list");
         
         HttpRequest request = HttpRequest.newBuilder()
@@ -78,20 +77,8 @@ public class VicidialClient{
         // Manejo de códigos de estado básicos
         if (response.statusCode() != 200) {
             throw new IOException("Error al llamar a la API de Vicidial. Código de estado: " + response.statusCode());
-        }
+        }        
 
-        // Devuelve el cuerpo de la respuesta
-        String respuesta = response.body();
-        String[] rows = respuesta.split("\\R");
-        ArrayList<String> campaigns = new ArrayList<>(); 
-        
-        for( String row : rows){
-            String[] segments = row.split("\\|");
-            String active = segments[2].equalsIgnoreCase("y") ? "✅" : "❌";                
-            
-          campaigns.add(active + " ID: " + segments[0] + " | Description: " + segments[1]);
-        }
-
-        return String.join("\n", campaigns);
+        return response.body();
     }
 }

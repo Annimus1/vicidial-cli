@@ -1,39 +1,41 @@
 package dev.pablo.cli;
 
-import java.io.IOException;
-import java.net.http.HttpClient;
-import java.time.Duration;
-import dev.pablo.api.VicidialClient;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Help.Ansi;
 
-public class MainApplication {
+import java.util.concurrent.Callable;
+
+import dev.pablo.api.CampaignsCommand;
+
+@Command(
+    name = "vicidial-cli",
+    mixinStandardHelpOptions = true, // Habilita --help, -h, --version
+    version = "Vicidial CLI 1.0",
+    description = "Herramienta de línea de comandos para la API de Vicidial."
+)
+public class MainApplication implements Callable<Integer> {
+    @CommandLine.Spec
+    CommandSpec spec; 
 
     public static void main(String[] args) {
-        // 1. Crear el HttpClient (El motor HTTP)
-        HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
-            
-        // 2. Crear una instancia de la clase cliente API (VicidialClient)
-        VicidialClient client = new VicidialClient(httpClient);
+        // Reemplazamos la lógica de la API por el motor de Picocli
         
-        try {
-            // 3. Ejecutar la llamada síncrona
-            // El programa se detiene en este punto hasta que hay respuesta.
-            String rawResult = client.getCampaignsSync(); 
+        int exitCode = new CommandLine(new MainApplication())
+                            .addSubcommand("getAllCampaigns", CampaignsCommand.class)
             
-            // 4. Mostrar el resultado
-            System.out.println(rawResult); 
+                            .execute(args);
             
-        } catch (IOException e) {
-            // Manejo de errores de red o códigos de estado HTTP no exitosos
-            System.err.println("❌ Error en la comunicación con la API:");
-            System.err.println(e.getMessage());
-            
-        } catch (InterruptedException e) {
-            // Manejo de interrupción del hilo
-            System.err.println("❌ La petición fue interrumpida.");
-            // Restaurar el estado de interrupción
-            Thread.currentThread().interrupt(); 
-        }
+        System.exit(exitCode);
+    }
+    
+    @Override
+    public Integer call() {
+        
+        // Comportamiento por defecto
+        CommandLine.usage(spec.commandLine(), System.out); 
+        
+        return 0; 
     }
 }
