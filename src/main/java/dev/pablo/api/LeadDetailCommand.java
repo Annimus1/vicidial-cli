@@ -7,6 +7,8 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Help.Ansi;
 
+import dev.pablo.models.LeadModel;
+
 @Command(name="leadDetails", description="Muestra toda la informacion de un contacto en específico.")
 public class LeadDetailCommand implements Callable<Integer> {
 
@@ -24,47 +26,11 @@ public class LeadDetailCommand implements Callable<Integer> {
 
         try {
             String leadDetails = client.getLeadInfo(leadId);
-            String[] details = leadDetails.split("\\|");
-            String[] fields = {
-                "status",
-                "user",
-                "vendor_lead_code",
-                "source_id",
-                "list_id",
-                "gmt_offset_now",
-                "phone_code",
-                "phone_number",
-                "title",
-                "first_name",
-                "middle_initial",
-                "last_name",
-                "address1",
-                "address2",
-                "address3",
-                "city",
-                "state",
-                "province",
-                "postal_code",
-                "country_code",
-                "gender",
-                "date_of_birth",
-                "alt_phone",
-                "email",
-                "security_phrase",
-                "comments",
-                "called_count",
-                "last_local_call_time",
-                "rank",
-                "owner",
-                "entry_list_id",
-                "lead_id"
-            };
+            LeadModel lead = new LeadModel(leadDetails);
 
             System.out.println(Ansi.AUTO.text("\n@|green ✅ Listas Asociadas:|@"));
             System.out.println("---------------------------------------------------------");           
-            for(int i=0; i<details.length; i++){
-                    System.out.println(fields[i] +": "+details[i]);
-                }
+            System.out.println(lead.toString());
             System.out.println("---------------------------------------------------------");
             
             return 0;
