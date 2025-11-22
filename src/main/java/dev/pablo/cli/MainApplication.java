@@ -3,11 +3,11 @@ package dev.pablo.cli;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Help.Ansi;
 
 import java.util.concurrent.Callable;
 
 import dev.pablo.api.CampaignsCommand;
+import dev.pablo.api.LeadDetailCommand;
 
 @Command(
     name = "vicidial-cli",
@@ -24,6 +24,7 @@ public class MainApplication implements Callable<Integer> {
         
         int exitCode = new CommandLine(new MainApplication())
                             .addSubcommand("getAllCampaigns", CampaignsCommand.class)
+                            .addSubcommand("leadDetails", LeadDetailCommand.class)
             
                             .execute(args);
             

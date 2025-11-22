@@ -6,7 +6,7 @@ import picocli.CommandLine.Help.Ansi;
 import java.io.IOException;
 import java.util.concurrent.Callable;
 
-@Command(name = "campaigns", description = "Obtiene y muestra la lista de campañas activas/inactivas de Vicidial.")
+@Command(name = "getAllCampaigns", description = "Obtiene y muestra la lista de campañas activas/inactivas de Vicidial.")
 public class CampaignsCommand implements Callable<Integer> {
     private final VicidialClientSingleton client;
 
