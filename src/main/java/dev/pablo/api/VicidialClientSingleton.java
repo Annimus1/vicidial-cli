@@ -6,18 +6,20 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+
 import io.github.cdimascio.dotenv.Dotenv;
 
-public class VicidialClient{
+public class VicidialClientSingleton{
 
-    private final HttpClient client;
+    public static VicidialClientSingleton instance = null;
+    private HttpClient client;
     private final String baseUrl;
     // Configuración de credenciales (se cargan desde .env o variables de entorno)
     private final String apiUser;
     private final String apiPass;
     private final String source = "java";
 
-    public VicidialClient(HttpClient client) {
+    private VicidialClientSingleton(HttpClient client) {
         // Configuramos el cliente con un timeout para evitar bloqueos infinitos.
         this.client = client;
 
@@ -42,6 +44,17 @@ public class VicidialClient{
         if (this.baseUrl == null || this.apiUser == null || this.apiPass == null) {
             throw new IllegalStateException("Faltan credenciales: define BASE_URL, API_USER y API_PASSWORD en .env o en variables de entorno.");
         }
+    }
+
+    public static VicidialClientSingleton getInstance(){
+        if(VicidialClientSingleton.instance == null){
+            HttpClient client = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+            VicidialClientSingleton.instance = new VicidialClientSingleton(client);
+        }
+
+        return VicidialClientSingleton.instance;
     }
 
     private String buildApiUrl(String functionName) {

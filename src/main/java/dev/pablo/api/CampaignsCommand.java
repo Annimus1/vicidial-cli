@@ -4,19 +4,14 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Ansi;
 
 import java.io.IOException;
-import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.concurrent.Callable;
 
 @Command(name = "campaigns", description = "Obtiene y muestra la lista de campañas activas/inactivas de Vicidial.")
 public class CampaignsCommand implements Callable<Integer> {
-    private final VicidialClient client;
+    private final VicidialClientSingleton client;
 
     public CampaignsCommand() {
-        HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
-        this.client = new VicidialClient(httpClient);
+        this.client = VicidialClientSingleton.getInstance();
     }
 
     @Override
