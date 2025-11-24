@@ -2,12 +2,16 @@ package dev.pablo.api;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
+import dev.pablo.models.LeadModel;
 import io.github.cdimascio.dotenv.Dotenv;
+import picocli.CommandLine.Help.Ansi;
 
 public class VicidialClientSingleton {
 
@@ -128,11 +132,75 @@ public class VicidialClientSingleton {
      * @throws InterruptedException Si el hilo es interrumpido durante la espera.
      */
     public String getLeadInfo(String leadId) throws IOException, InterruptedException {
-        
+
         String url = buildApiUrl("lead_all_info") + "&lead_id=" + leadId;
 
         String response = executeApiCall(url);
         return response;
+    }
+
+    /**
+     * 
+     * 
+     * @param leadId Identificador unico de un lead a ser duplicado.
+     * @param listId Identificador unico de la lista en la cual se colocara el lead.
+     * @param comments Notas que seran agregadas (Default "").
+     * @param email Correo Electronico que sera sobre-escrito (Default "").
+     * @return Id del Lead Creado.
+     * @throws IOException          Si ocurre un error de entrada/salida (red).
+     * @throws InterruptedException Si el hilo es interrumpido durante la espera.
+     */
+    public void DuplicateLeadInList(String leadId, String listId, String comments, String email)
+            throws IOException, InterruptedException {
+        // Crear la url
+        String url = buildApiUrl("lead_all_info") + "&lead_id=" + leadId;
+        
+        // Buscar Contacto
+        System.out.println(Ansi.AUTO.text("@|yellow Searching lead details for ID: " + leadId + "...|@"));
+        String response = executeApiCall(url);
+
+        // Verificar que exista
+        if (response.isEmpty()) {
+            System.out.println(Ansi.AUTO.text("@|red Lead not found for ID: " + leadId + "...|@"));
+            throw new InterruptedException("Lead not found for ID: " + leadId);
+        }
+
+        // Crear objeto Lead
+        System.out.println(Ansi.AUTO.text("@|green Lead found for ID: " + leadId + "...|@"));
+        LeadModel contactInfo = new LeadModel(response);
+
+        // Modificar lead si es necesario
+        System.out.println(Ansi.AUTO.text("@|blue Changing key info ...|@"));
+        if(!comments.isEmpty()){ contactInfo.setComments(comments);} 
+        if(!email.isEmpty()){ contactInfo.setEmail(email);}
+
+        //crear url para nuevo lead
+        String urlLead = buildApiUrl("add_lead") +
+        "&phone_number="+contactInfo.getPhone_number()+
+        "&phone_code=1"+
+        "&list_id=" + listId + 
+        "&first_name=" + URLEncoder.encode(contactInfo.getFirst_name(), StandardCharsets.UTF_8) +
+        "&last_name=" + URLEncoder.encode(contactInfo.getLast_name(), StandardCharsets.UTF_8) +
+        "&address1=" + URLEncoder.encode(contactInfo.getAddress1(), StandardCharsets.UTF_8) +
+        "&address2=" + URLEncoder.encode(contactInfo.getAddress2(), StandardCharsets.UTF_8) +
+        "&address3=" + URLEncoder.encode(contactInfo.getAddress3(), StandardCharsets.UTF_8) +
+        "&city=" + URLEncoder.encode(contactInfo.getCity(), StandardCharsets.UTF_8) +
+        "&state=" + contactInfo.getState() +
+        "&alt_phone=" + contactInfo.getAlt_phone() +
+        "&email=" + contactInfo.getEmail() +
+        "&comments=" + URLEncoder.encode(contactInfo.getComments(), StandardCharsets.UTF_8);
+
+        // hacer peticion de creacion
+        System.out.println(Ansi.AUTO.text("@|blue Creating New lead in List Id: "+ listId +"...|@"));
+        String LeadResponse = executeApiCall(urlLead);
+
+        if(LeadResponse.isEmpty()){throw new InterruptedException("Fail while creating new Lead (Already Exists).");}
+
+        // deivide la respuesta por '|'
+        String NewLeadId = LeadResponse.split("\\|")[2];
+        System.out.println(Ansi.AUTO.text("@|green New lead Created inside list "+ listId +"\nLead ID: "+NewLeadId+"|@"));
+
+        return;
     }
 
 }

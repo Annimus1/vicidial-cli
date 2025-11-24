@@ -9,7 +9,11 @@ import picocli.CommandLine.Help.Ansi;
 
 import dev.pablo.models.LeadModel;
 
-@Command(name="leadDetails", description="Muestra toda la informacion de un contacto en específico.")
+@Command(
+    name="leadDetails", 
+    description="Muestra toda la informacion de un contacto en específico.",
+    mixinStandardHelpOptions = true
+)
 public class LeadDetailCommand implements Callable<Integer> {
 
     private final VicidialClientSingleton client;
