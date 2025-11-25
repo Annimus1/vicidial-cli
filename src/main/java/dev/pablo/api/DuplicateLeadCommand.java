@@ -17,13 +17,13 @@ import picocli.CommandLine.Help.Ansi;;
 public class DuplicateLeadCommand implements Callable<Integer> {
 
     private VicidialClientSingleton client;
-    @Parameters(index = "0")
+    @Parameters(index = "0", description="Identificador del contacto.")
     private String leadId;
-    @Parameters(index = "1")
+    @Parameters(index = "1", description="Identificador de la lista destino.")
     private String listId;
-    @Option(names = { "-c", "--comments"}, defaultValue="")
+    @Option(names = { "-c", "--comments"}, description = "Notas del agente.", defaultValue="")
     private String comments;
-    @Option(names = { "-e", "--email" }, defaultValue="")
+    @Option(names = { "-e", "--email" }, description = "Email a sobre escribir.", defaultValue="")
     private String email;
 
     public DuplicateLeadCommand() {

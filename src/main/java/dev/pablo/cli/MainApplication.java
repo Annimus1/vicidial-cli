@@ -9,6 +9,7 @@ import java.util.concurrent.Callable;
 import dev.pablo.api.CampaignsCommand;
 import dev.pablo.api.LeadDetailCommand;
 import dev.pablo.api.DuplicateLeadCommand;
+import dev.pablo.api.UpdateCredCommand;
 
 @Command(
     name = "vicidial-cli",
@@ -26,8 +27,9 @@ public class MainApplication implements Callable<Integer> {
         int exitCode = new CommandLine(new MainApplication())
                             .addSubcommand("getAllCampaigns", CampaignsCommand.class)
                             .addSubcommand("leadDetails", LeadDetailCommand.class)
-                            .addSubcommand("DuplicateInList", DuplicateLeadCommand.class)
-            
+                            .addSubcommand("duplicateInList", DuplicateLeadCommand.class)
+                            .addSubcommand("updateCred", UpdateCredCommand.class)
+
                             .execute(args);
             
         System.exit(exitCode);

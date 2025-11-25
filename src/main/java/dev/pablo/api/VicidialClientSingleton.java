@@ -22,6 +22,7 @@ public class VicidialClientSingleton {
     private final String apiUser;
     private final String apiPass;
     private final String source = "java";
+    private final String serverIp;
 
     private VicidialClientSingleton(HttpClient client) {
         // Configuramos el cliente con un timeout para evitar bloqueos infinitos.
@@ -37,6 +38,7 @@ public class VicidialClientSingleton {
         String envBase = dotenv.get("BASE_URL");
         String envUser = dotenv.get("API_USER");
         String envPass = dotenv.get("API_PASSWORD");
+        String serverIp = dotenv.get("SERVER_IP");
 
         String sysBase = System.getenv("BASE_URL");
         String sysUser = System.getenv("API_USER");
@@ -45,6 +47,7 @@ public class VicidialClientSingleton {
         this.baseUrl = (envBase != null && !envBase.isBlank()) ? envBase : sysBase;
         this.apiUser = (envUser != null && !envUser.isBlank()) ? envUser : sysUser;
         this.apiPass = (envPass != null && !envPass.isBlank()) ? envPass : sysPass;
+        this.serverIp = (serverIp != null && !serverIp.isBlank()) ? serverIp : serverIp;
 
         if (this.baseUrl == null || this.apiUser == null || this.apiPass == null) {
             throw new IllegalStateException(
@@ -140,12 +143,15 @@ public class VicidialClientSingleton {
     }
 
     /**
+     * Crea un Contacto nuevo basado en uno ya existente y lo Coloca en una
+     * lista en especifico, pudiendo sobre-escribir las notas (comments)
+     * y el correo electronico (email).
      * 
-     * 
-     * @param leadId Identificador unico de un lead a ser duplicado.
-     * @param listId Identificador unico de la lista en la cual se colocara el lead.
+     * @param leadId   Identificador unico de un lead a ser duplicado.
+     * @param listId   Identificador unico de la lista en la cual se colocara el
+     *                 lead.
      * @param comments Notas que seran agregadas (Default "").
-     * @param email Correo Electronico que sera sobre-escrito (Default "").
+     * @param email    Correo Electronico que sera sobre-escrito (Default "").
      * @return Id del Lead Creado.
      * @throws IOException          Si ocurre un error de entrada/salida (red).
      * @throws InterruptedException Si el hilo es interrumpido durante la espera.
@@ -154,7 +160,7 @@ public class VicidialClientSingleton {
             throws IOException, InterruptedException {
         // Crear la url
         String url = buildApiUrl("lead_all_info") + "&lead_id=" + leadId;
-        
+
         // Buscar Contacto
         System.out.println(Ansi.AUTO.text("@|yellow Searching lead details for ID: " + leadId + "...|@"));
         String response = executeApiCall(url);
@@ -171,36 +177,102 @@ public class VicidialClientSingleton {
 
         // Modificar lead si es necesario
         System.out.println(Ansi.AUTO.text("@|blue Changing key info ...|@"));
-        if(!comments.isEmpty()){ contactInfo.setComments(comments);} 
-        if(!email.isEmpty()){ contactInfo.setEmail(email);}
+        if (!comments.isEmpty()) {
+            contactInfo.setComments(comments);
+        }
+        if (!email.isEmpty()) {
+            contactInfo.setEmail(email);
+        }
 
-        //crear url para nuevo lead
+        // crear url para nuevo lead
         String urlLead = buildApiUrl("add_lead") +
-        "&phone_number="+contactInfo.getPhone_number()+
-        "&phone_code=1"+
-        "&list_id=" + listId + 
-        "&first_name=" + URLEncoder.encode(contactInfo.getFirst_name(), StandardCharsets.UTF_8) +
-        "&last_name=" + URLEncoder.encode(contactInfo.getLast_name(), StandardCharsets.UTF_8) +
-        "&address1=" + URLEncoder.encode(contactInfo.getAddress1(), StandardCharsets.UTF_8) +
-        "&address2=" + URLEncoder.encode(contactInfo.getAddress2(), StandardCharsets.UTF_8) +
-        "&address3=" + URLEncoder.encode(contactInfo.getAddress3(), StandardCharsets.UTF_8) +
-        "&city=" + URLEncoder.encode(contactInfo.getCity(), StandardCharsets.UTF_8) +
-        "&state=" + contactInfo.getState() +
-        "&alt_phone=" + contactInfo.getAlt_phone() +
-        "&email=" + contactInfo.getEmail() +
-        "&comments=" + URLEncoder.encode(contactInfo.getComments(), StandardCharsets.UTF_8);
+                "&phone_number=" + contactInfo.getPhone_number() +
+                "&phone_code=1" +
+                "&list_id=" + listId +
+                "&first_name=" + URLEncoder.encode(contactInfo.getFirst_name(), StandardCharsets.UTF_8) +
+                "&last_name=" + URLEncoder.encode(contactInfo.getLast_name(), StandardCharsets.UTF_8) +
+                "&address1=" + URLEncoder.encode(contactInfo.getAddress1(), StandardCharsets.UTF_8) +
+                "&address2=" + URLEncoder.encode(contactInfo.getAddress2(), StandardCharsets.UTF_8) +
+                "&address3=" + URLEncoder.encode(contactInfo.getAddress3(), StandardCharsets.UTF_8) +
+                "&city=" + URLEncoder.encode(contactInfo.getCity(), StandardCharsets.UTF_8) +
+                "&state=" + contactInfo.getState() +
+                "&alt_phone=" + contactInfo.getAlt_phone() +
+                "&email=" + contactInfo.getEmail() +
+                "&comments=" + URLEncoder.encode(contactInfo.getComments(), StandardCharsets.UTF_8);
 
         // hacer peticion de creacion
-        System.out.println(Ansi.AUTO.text("@|blue Creating New lead in List Id: "+ listId +"...|@"));
+        System.out.println(Ansi.AUTO.text("@|blue Creating New lead in List Id: " + listId + "...|@"));
         String LeadResponse = executeApiCall(urlLead);
 
-        if(LeadResponse.isEmpty()){throw new InterruptedException("Fail while creating new Lead (Already Exists).");}
+        if (LeadResponse.isEmpty()) {
+            throw new InterruptedException("Fail while creating new Lead (Already Exists).");
+        }
 
         // deivide la respuesta por '|'
         String NewLeadId = LeadResponse.split("\\|")[2];
-        System.out.println(Ansi.AUTO.text("@|green New lead Created inside list "+ listId +"\nLead ID: "+NewLeadId+"|@"));
+        System.out.println(
+                Ansi.AUTO.text("@|green New lead Created inside list " + listId + "\nLead ID: " + NewLeadId + "|@"));
 
         return;
     }
 
+    /**
+     * Actualiza un Usuario Vicidial sobre escribiendo nombre y/o password.
+     * 
+     * @param ID       Identificador del Usuario
+     * @param name     Nuevo nombre (Default "").
+     * @param password Nueva Password (Default "").
+     * @throws IOException          Cuando ocurre un error al actualizar el Usuario
+     * @throws InterruptedException Cuando el hilo es interrumpido durante la
+     *                              espera.
+     */
+    public void updateUser(String ID, String name, String password) throws IOException, InterruptedException {
+        // Crear la url
+        String userUrl = buildApiUrl("update_user") + "&agent_user=" + ID;
+
+        if (!name.isEmpty()) {
+            userUrl = userUrl + String.format("&agent_full_name=%s", URLEncoder.encode(name, StandardCharsets.UTF_8));
+        }
+        if (!password.isEmpty()) {
+            userUrl = userUrl + String.format("&agent_pass=%s", password);
+        }
+
+        String response = executeApiCall(userUrl);
+
+        if (response.contains("ERROR:")) {
+            throw new IOException("Error while updating " + ID);
+        }
+
+        return;
+    }
+
+    /**
+     * Actualiza la Password de un Phone Vicidial.
+     * 
+     * @param ID       Identificador del Phone.
+     * @param password Nueva Password (Default "").
+     * @throws IOException          Cuando ocurre un error al actualizar el Phone o
+     *                              si la password no es pasada.
+     * @throws InterruptedException Cuando el hilo es interrumpido durante la
+     *                              espera.
+     */
+    public void updatePhone(String ID, String password) throws IOException, InterruptedException {
+        // Crear la url
+        String phoneUrl = buildApiUrl("update_phone") +
+                "&extension=" + ID +
+                "&server_ip=" + this.serverIp +
+                "&phone_pass=" + password;
+
+        if (password.isEmpty()) {
+            throw new IOException("Error: No password given.");
+        }
+
+        String response = executeApiCall(phoneUrl);
+
+        if (response.contains("ERROR:")) {
+            throw new IOException("Error while updating " + ID);
+        }
+
+        return;
+    }
 }
