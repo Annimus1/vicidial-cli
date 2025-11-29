@@ -8,7 +8,7 @@ import java.util.concurrent.Callable;
 
 @Command(
     name = "getAllCampaigns", 
-    description = "Obtiene y muestra la lista de campañas activas/inactivas de Vicidial.",
+    description = "Gets and displays the list of active/inactive campaigns from Vicidial.",
     mixinStandardHelpOptions = true
 )
 public class CampaignsCommand implements Callable<Integer> {
@@ -23,7 +23,7 @@ public class CampaignsCommand implements Callable<Integer> {
         System.out.println(Ansi.AUTO.text("@|yellow Searching campaigns...|@"));
 
         try {
-            // 2. Llama al método de la capa API para obtener los datos formateados
+            // 2. Call the API layer method to obtain formatted data
             String formattedResult = client.getCampaigns();
 
             System.out.println(Ansi.AUTO.text("\n@|blue Campaigns list's obtained:|@"));
@@ -38,13 +38,13 @@ public class CampaignsCommand implements Callable<Integer> {
             }
             System.out.println("---------------------------------------------------------");
 
-            return 0; // Éxito
+            return 0; // Success
 
         } catch (IOException e) {
-            System.err.println(Ansi.AUTO.text("❌ @|red Error de la API o de red:|@ " + e.getMessage()));
+            System.err.println(Ansi.AUTO.text("❌ @|red API or network error:|@ " + e.getMessage()));
             return 1; // Error
         } catch (InterruptedException e) {
-            System.err.println(Ansi.AUTO.text("❌ @|red La petición fue interrumpida.|@"));
+            System.err.println(Ansi.AUTO.text("❌ @|red The request was interrupted.|@"));
             Thread.currentThread().interrupt();
             return 1;
         }

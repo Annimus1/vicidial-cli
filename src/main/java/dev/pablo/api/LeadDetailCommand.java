@@ -11,13 +11,13 @@ import dev.pablo.models.LeadModel;
 
 @Command(
     name="leadDetails", 
-    description="Muestra toda la informacion de un contacto en específico.",
+    description="Displays all information for a specific contact (lead).",
     mixinStandardHelpOptions = true
 )
 public class LeadDetailCommand implements Callable<Integer> {
 
     private final VicidialClientSingleton client;
-    @Parameters(index="0",description="El ID del contacto (ej. '1125')")
+    @Parameters(index="0",description="The lead ID (e.g., '1125')")
     private String leadId;
 
     public LeadDetailCommand() {
@@ -32,17 +32,17 @@ public class LeadDetailCommand implements Callable<Integer> {
             String leadDetails = client.getLeadInfo(leadId);
             LeadModel lead = new LeadModel(leadDetails);
 
-            System.out.println(Ansi.AUTO.text("\n@|green ✅ Listas Asociadas:|@"));
+            System.out.println(Ansi.AUTO.text("\n@|green ✅ Associated Lists:|@"));
             System.out.println("---------------------------------------------------------");           
             System.out.println(lead.toString());
             System.out.println("---------------------------------------------------------");
             
             return 0;
         } catch (IOException e) {
-            System.err.println(Ansi.AUTO.text("❌ @|red Error de la API o de red:|@ " + e.getMessage()));
+            System.err.println(Ansi.AUTO.text("❌ @|red API or network error:|@ " + e.getMessage()));
             return 1;
         } catch (InterruptedException e) {
-            System.err.println(Ansi.AUTO.text("❌ @|red La petición fue interrumpida.|@"));
+            System.err.println(Ansi.AUTO.text("❌ @|red The request was interrupted.|@"));
             Thread.currentThread().interrupt(); 
             return 1;
         }

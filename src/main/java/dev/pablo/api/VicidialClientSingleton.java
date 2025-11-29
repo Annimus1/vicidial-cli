@@ -18,18 +18,18 @@ public class VicidialClientSingleton {
     public static VicidialClientSingleton instance = null;
     private HttpClient client;
     private final String baseUrl;
-    // Configuración de credenciales (se cargan desde .env o variables de entorno)
+    // Credentials configuration (loaded from .env or system environment variables)
     private final String apiUser;
     private final String apiPass;
     private final String source = "java";
     private final String serverIp;
+    private final String templateId;
 
     private VicidialClientSingleton(HttpClient client) {
-        // Configuramos el cliente con un timeout para evitar bloqueos infinitos.
+        // Configure the client with a timeout to avoid infinite blocking.
         this.client = client;
 
-        // Cargamos variables desde .env si existe, y si no, usamos las variables de
-        // entorno del sistema.
+        // Load variables from .env if present, otherwise use system environment variables.
         Dotenv dotenv = Dotenv.configure()
                 .directory(".")
                 .ignoreIfMissing()
@@ -39,6 +39,7 @@ public class VicidialClientSingleton {
         String envUser = dotenv.get("API_USER");
         String envPass = dotenv.get("API_PASSWORD");
         String serverIp = dotenv.get("SERVER_IP");
+        String templateId = dotenv.get("TEMPLATE_ID");
 
         String sysBase = System.getenv("BASE_URL");
         String sysUser = System.getenv("API_USER");
@@ -48,10 +49,11 @@ public class VicidialClientSingleton {
         this.apiUser = (envUser != null && !envUser.isBlank()) ? envUser : sysUser;
         this.apiPass = (envPass != null && !envPass.isBlank()) ? envPass : sysPass;
         this.serverIp = (serverIp != null && !serverIp.isBlank()) ? serverIp : serverIp;
+        this.templateId = (templateId != null && !templateId.isBlank()) ? templateId : templateId;
 
         if (this.baseUrl == null || this.apiUser == null || this.apiPass == null) {
             throw new IllegalStateException(
-                    "Faltan credenciales: define BASE_URL, API_USER y API_PASSWORD en .env o en variables de entorno.");
+                "Missing credentials: define BASE_URL, API_USER and API_PASSWORD in .env or environment variables.");
         }
     }
 
@@ -67,7 +69,7 @@ public class VicidialClientSingleton {
     }
 
     private String buildApiUrl(String functionName) {
-        // Construye la URL con la función get_campaign_list
+        // Build the URL using the provided function name
         return new StringBuilder()
                 .append(baseUrl)
                 .append("?source=").append(source)
@@ -78,11 +80,11 @@ public class VicidialClientSingleton {
     }
 
     /**
-     * Realiza una petición GET SÍNCRONA para obtener todas las campañas.
-     * 
-     * @return El cuerpo de la respuesta de la API (JSON/XML) como String.
-     * @throws IOException          Si ocurre un error de entrada/salida (red).
-     * @throws InterruptedException Si el hilo es interrumpido durante la espera.
+     * Performs a synchronous GET request to retrieve all campaigns.
+     *
+     * @return The body of the API response (JSON/XML) as a String.
+     * @throws IOException          If an I/O (network) error occurs.
+     * @throws InterruptedException If the thread is interrupted while waiting.
      */
     public String getCampaigns() throws IOException, InterruptedException {
         String url = buildApiUrl("campaigns_list");
@@ -91,23 +93,22 @@ public class VicidialClientSingleton {
                 .uri(URI.create(url))
                 .GET()
                 .header("Accept", "application/json")
-                .timeout(Duration.ofSeconds(15)) // Timeout de petición
+                .timeout(Duration.ofSeconds(15)) // Request timeout
                 .build();
 
-        // Ejecución SÍNCRONA: El hilo se bloquea aquí hasta que se recibe la respuesta.
+        // Synchronous execution: the thread blocks here until a response is received.
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-        // Manejo de códigos de estado básicos
+        // Basic status code handling
         if (response.statusCode() != 200) {
-            throw new IOException("Error al llamar a la API de Vicidial. Código de estado: " + response.statusCode());
+            throw new IOException("Error calling the Vicidial API. Status code: " + response.statusCode());
         }
 
         return response.body();
     }
 
     /**
-     * Método auxiliar para ejecutar la llamada HTTP (para evitar duplicación de
-     * código)
+     * Helper method to execute an HTTP call (to avoid duplicating code).
      */
     private String executeApiCall(String url) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
@@ -119,20 +120,18 @@ public class VicidialClientSingleton {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            throw new IOException("Error al llamar a la API. Código de estado: " + response.statusCode());
+            throw new IOException("Error calling the API. Status code: " + response.statusCode());
         }
         return response.body();
     }
 
     /**
-     * Obtiene informacion detallada de una Campaña, extrayendo las listas activas.
-     * Utiliza 'update_campaign' como workaround.
-     * 
-     * @param campaignId identificador unico de la campaña.
-     * @return Las IDs de las listas activas separadas por saltos de línea, o un
-     *         mensaje de error.
-     * @throws IOException          Si ocurre un error de entrada/salida (red).
-     * @throws InterruptedException Si el hilo es interrumpido durante la espera.
+     * Obtains detailed information for a lead.
+     *
+     * @param leadId unique identifier of the lead.
+     * @return The API response body for the lead.
+     * @throws IOException          If an I/O (network) error occurs.
+     * @throws InterruptedException If the thread is interrupted while waiting.
      */
     public String getLeadInfo(String leadId) throws IOException, InterruptedException {
 
@@ -143,39 +142,36 @@ public class VicidialClientSingleton {
     }
 
     /**
-     * Crea un Contacto nuevo basado en uno ya existente y lo Coloca en una
-     * lista en especifico, pudiendo sobre-escribir las notas (comments)
-     * y el correo electronico (email).
-     * 
-     * @param leadId   Identificador unico de un lead a ser duplicado.
-     * @param listId   Identificador unico de la lista en la cual se colocara el
-     *                 lead.
-     * @param comments Notas que seran agregadas (Default "").
-     * @param email    Correo Electronico que sera sobre-escrito (Default "").
-     * @return Id del Lead Creado.
-     * @throws IOException          Si ocurre un error de entrada/salida (red).
-     * @throws InterruptedException Si el hilo es interrumpido durante la espera.
+     * Creates a new contact based on an existing one and places it in a specific list. You can overwrite comments
+     * and/or the email address.
+     *
+     * @param leadId   Unique identifier of the lead to duplicate.
+     * @param listId   Unique identifier of the list where the new lead will be placed.
+     * @param comments Notes to be added (Default "").
+     * @param email    Email to overwrite (Default "").
+     * @throws IOException          If an I/O (network) error occurs.
+     * @throws InterruptedException If the thread is interrupted while waiting.
      */
     public void DuplicateLeadInList(String leadId, String listId, String comments, String email)
             throws IOException, InterruptedException {
-        // Crear la url
+        // Build the URL
         String url = buildApiUrl("lead_all_info") + "&lead_id=" + leadId;
 
-        // Buscar Contacto
+        // Lookup the contact
         System.out.println(Ansi.AUTO.text("@|yellow Searching lead details for ID: " + leadId + "...|@"));
         String response = executeApiCall(url);
 
-        // Verificar que exista
+        // Verify that it exists
         if (response.isEmpty()) {
             System.out.println(Ansi.AUTO.text("@|red Lead not found for ID: " + leadId + "...|@"));
             throw new InterruptedException("Lead not found for ID: " + leadId);
         }
 
-        // Crear objeto Lead
+        // Create Lead object
         System.out.println(Ansi.AUTO.text("@|green Lead found for ID: " + leadId + "...|@"));
         LeadModel contactInfo = new LeadModel(response);
 
-        // Modificar lead si es necesario
+        // Modify the lead if necessary
         System.out.println(Ansi.AUTO.text("@|blue Changing key info ...|@"));
         if (!comments.isEmpty()) {
             contactInfo.setComments(comments);
@@ -184,7 +180,7 @@ public class VicidialClientSingleton {
             contactInfo.setEmail(email);
         }
 
-        // crear url para nuevo lead
+        // Create URL for the new lead
         String urlLead = buildApiUrl("add_lead") +
                 "&phone_number=" + contactInfo.getPhone_number() +
                 "&phone_code=1" +
@@ -200,7 +196,7 @@ public class VicidialClientSingleton {
                 "&email=" + contactInfo.getEmail() +
                 "&comments=" + URLEncoder.encode(contactInfo.getComments(), StandardCharsets.UTF_8);
 
-        // hacer peticion de creacion
+        // Make create request
         System.out.println(Ansi.AUTO.text("@|blue Creating New lead in List Id: " + listId + "...|@"));
         String LeadResponse = executeApiCall(urlLead);
 
@@ -208,7 +204,7 @@ public class VicidialClientSingleton {
             throw new InterruptedException("Fail while creating new Lead (Already Exists).");
         }
 
-        // deivide la respuesta por '|'
+        // Split the response by '|'
         String NewLeadId = LeadResponse.split("\\|")[2];
         System.out.println(
                 Ansi.AUTO.text("@|green New lead Created inside list " + listId + "\nLead ID: " + NewLeadId + "|@"));
@@ -217,17 +213,16 @@ public class VicidialClientSingleton {
     }
 
     /**
-     * Actualiza un Usuario Vicidial sobre escribiendo nombre y/o password.
-     * 
-     * @param ID       Identificador del Usuario
-     * @param name     Nuevo nombre (Default "").
-     * @param password Nueva Password (Default "").
-     * @throws IOException          Cuando ocurre un error al actualizar el Usuario
-     * @throws InterruptedException Cuando el hilo es interrumpido durante la
-     *                              espera.
+     * Updates a Vicidial User, overwriting name and/or password.
+     *
+     * @param ID       User identifier
+     * @param name     New name (Default "").
+     * @param password New password (Default "").
+     * @throws IOException          When an error occurs updating the User.
+     * @throws InterruptedException When the thread is interrupted while waiting.
      */
     public void updateUser(String ID, String name, String password) throws IOException, InterruptedException {
-        // Crear la url
+        // Build the URL
         String userUrl = buildApiUrl("update_user") + "&agent_user=" + ID;
 
         if (!name.isEmpty()) {
@@ -247,17 +242,15 @@ public class VicidialClientSingleton {
     }
 
     /**
-     * Actualiza la Password de un Phone Vicidial.
-     * 
-     * @param ID       Identificador del Phone.
-     * @param password Nueva Password (Default "").
-     * @throws IOException          Cuando ocurre un error al actualizar el Phone o
-     *                              si la password no es pasada.
-     * @throws InterruptedException Cuando el hilo es interrumpido durante la
-     *                              espera.
+     * Updates the password of a Vicidial Phone.
+     *
+     * @param ID       Phone identifier.
+     * @param password New password (Default "").
+     * @throws IOException          When an error occurs updating the Phone, or when password is not provided.
+     * @throws InterruptedException When the thread is interrupted while waiting.
      */
     public void updatePhone(String ID, String password) throws IOException, InterruptedException {
-        // Crear la url
+        // Build the URL
         String phoneUrl = buildApiUrl("update_phone") +
                 "&extension=" + ID +
                 "&server_ip=" + this.serverIp +
@@ -275,4 +268,66 @@ public class VicidialClientSingleton {
 
         return;
     }
+
+    /**
+     * Creates a User for a given campaign using a Usergroup ID.
+     *
+     * @param ID        Unique identifier for the User; will be used as Login.
+     * @param password  Password for the user, used for Login.
+     * @param name      User's display name, used in reports.
+     * @param userGroup Identifier of the Usergroup, used to assign the user to a campaign.
+     * @throws IOException          When an error occurs creating the User.
+     * @throws InterruptedException When the thread is interrupted while waiting.
+     */
+    public void createUser(String ID, String password, String name, String userGroup)
+            throws IOException, InterruptedException {
+        String userURL = buildApiUrl("add_user") + "&agent_user=" + ID + "&agent_pass=" + password
+                + "&hotkeys_active=1&closer_default_blended=1&agent_user_level=1&agent_full_name=" + name
+                + "&agent_user_group=" + userGroup;
+
+        String response = executeApiCall(userURL);
+
+        if (response.contains("ERROR:")) {
+            throw new IOException("Error while creating user " + ID + ":\n" + response);
+        }
+
+        return;
+    }
+
+    /**
+     * Creates a Phone for a User.
+     *
+     * @param ID       Unique identifier for the Phone, used as Login.
+     * @param password Password for the Phone, used for Login.
+     * @throws IOException          When an error occurs creating the Phone.
+     * @throws InterruptedException When the thread is interrupted while waiting.
+     */
+    public void createPhone(String ID, String password) throws IOException, InterruptedException {
+        String cid = "0000000000";
+        String phoneURL = buildApiUrl("add_phone") +
+                "&extension=" + ID +
+                "&dialplan_number=" + ID +
+                "&voicemail_id=" + ID +
+                "&phone_login=" + ID +
+                "&phone_pass=" + password +
+                "&server_ip=" + this.serverIp +
+                "&protocol=SIP" +
+                "&registration_password=" + password +
+                "&phone_full_name=" + ID +
+                "&local_gmt=-5.00" +
+                "&is_webphone=Y" +
+                "&webphone_auto_answer=Y" +
+                "&outbound_cid=" + cid +
+                "&template_id=" + templateId; // optional -> env
+
+        String response = executeApiCall(phoneURL);
+
+        if (response.contains("ERROR:")) {
+            throw new IOException("Error while creating phone " + ID + ":\n" + response);
+        }
+
+        return;
+
+    }
+
 }

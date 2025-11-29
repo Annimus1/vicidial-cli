@@ -11,19 +11,19 @@ import picocli.CommandLine.Help.Ansi;;
 
 @Command( 
     name="DuplicateInList", 
-    description="Crea un nuevo Lead basado en otro existente y lo coloca en una lista determinada.",
+    description="Creates a new Lead based on an existing one and places it in a specific list.",
     mixinStandardHelpOptions = true
 )
 public class DuplicateLeadCommand implements Callable<Integer> {
 
     private VicidialClientSingleton client;
-    @Parameters(index = "0", description="Identificador del contacto.")
+    @Parameters(index = "0", description="The lead ID (contact identifier).")
     private String leadId;
-    @Parameters(index = "1", description="Identificador de la lista destino.")
+    @Parameters(index = "1", description="Destination list ID.")
     private String listId;
-    @Option(names = { "-c", "--comments"}, description = "Notas del agente.", defaultValue="")
+    @Option(names = { "-c", "--comments"}, description = "Agent notes.", defaultValue="")
     private String comments;
-    @Option(names = { "-e", "--email" }, description = "Email a sobre escribir.", defaultValue="")
+    @Option(names = { "-e", "--email" }, description = "Email to overwrite (optional).", defaultValue="")
     private String email;
 
     public DuplicateLeadCommand() {
@@ -36,10 +36,10 @@ public class DuplicateLeadCommand implements Callable<Integer> {
             client.DuplicateLeadInList(leadId, listId, comments, email);
             return 0;
         }catch (IOException e) {
-            System.err.println(Ansi.AUTO.text("❌ @|red Error de la API o de red:|@ " + e.getMessage()));
+            System.err.println(Ansi.AUTO.text("❌ @|red API or network error:|@ " + e.getMessage()));
             return 1;
         } catch (InterruptedException e) {
-            System.err.println(Ansi.AUTO.text("❌ @|red La petición fue interrumpida.|@"));
+            System.err.println(Ansi.AUTO.text("❌ @|red The request was interrupted.|@"));
             Thread.currentThread().interrupt(); 
             return 1;
         }

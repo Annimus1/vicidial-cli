@@ -1,7 +1,7 @@
 package dev.pablo.models;
 
 /**
- * Representa un unico objeto Lead
+ * Represents a single Lead object
  */
 public class LeadModel {
     private String status;
@@ -38,9 +38,8 @@ public class LeadModel {
     private String lead_id;
 
     /**
-     *  Crea un Objeto Lead a partir
-     *  de la respuesta de la api Vicidial.
-     *  Divide los campos basandose en el delimitador '|'.
+     *  Creates a Lead object from the Vicidial API response.
+     *  Splits the fields based on the '|' delimiter.
      */
     public LeadModel(String rowInput) {
         String[] details = rowInput.split("\\|");
