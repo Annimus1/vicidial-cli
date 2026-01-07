@@ -8,6 +8,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 
 import dev.pablo.models.LeadModel;
 import io.github.cdimascio.dotenv.Dotenv;
@@ -328,6 +329,28 @@ public class VicidialClientSingleton {
 
         return;
 
+    }
+
+    public String GetDIDs(String URL) throws IOException, InterruptedException{
+        
+
+        String originalInput = apiUser +":"+apiPass;
+        Base64.Encoder encoder = Base64.getEncoder();
+        String encodedString = encoder.encodeToString(originalInput.getBytes(StandardCharsets.UTF_8));
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(URL))
+                .GET()
+                .header("Authorization", "Basic " + encodedString)
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+                .timeout(Duration.ofSeconds(15)) // Request timeout
+                .build();
+        
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            throw new IOException("Error calling the API. Status code: " + response.statusCode());
+        }
+        
+        return response.body();
     }
 
 }
