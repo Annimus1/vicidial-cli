@@ -11,6 +11,7 @@ import dev.pablo.api.LeadDetailCommand;
 import dev.pablo.api.DuplicateLeadCommand;
 import dev.pablo.api.UpdateCredCommand;
 import dev.pablo.api.CreatCredentialCommand;
+import dev.pablo.api.DeleteDIDCommand;
 
 @Command(name = "vicidial-cli", mixinStandardHelpOptions = true, // Enables --help, -h, --version
     version = "Vicidial CLI 1.0", description = "Command-line tool for the Vicidial API.")
@@ -27,6 +28,7 @@ public class MainApplication implements Callable<Integer> {
                 .addSubcommand("getAllCampaigns", CampaignsCommand.class)
                 .addSubcommand("leadDetails", LeadDetailCommand.class)
                 .addSubcommand("updateCred", UpdateCredCommand.class)
+                .addSubcommand("deleteDIDs", DeleteDIDCommand.class)
 
                 .execute(args);
 
