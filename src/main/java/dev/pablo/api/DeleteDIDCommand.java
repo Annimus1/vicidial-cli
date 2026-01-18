@@ -122,7 +122,7 @@ public class DeleteDIDCommand implements Callable<Integer> {
   @Override
   public Integer call() {
     try {
-      String html = client.GetDIDs("https://cloud.yourserviceva.net/vicidial/admin.php?ADD=1300");
+      String html = client.getFromWeb("https://cloud.yourserviceva.net/vicidial/admin.php?ADD=1300");
       dids = HtmlParser.ParseDIDs(html);
       System.out.println(Ansi.AUTO.text("@|blue Total of #️⃣ " + dids.size() + " DIDs Found.|@"));
 

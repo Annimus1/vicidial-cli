@@ -331,7 +331,7 @@ public class VicidialClientSingleton {
 
     }
 
-    public String GetDIDs(String URL) throws IOException, InterruptedException{
+    public String getFromWeb(String URL) throws IOException, InterruptedException{
         
 
         String originalInput = apiUser +":"+apiPass;
