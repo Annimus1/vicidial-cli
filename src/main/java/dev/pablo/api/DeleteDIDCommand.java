@@ -52,6 +52,7 @@ import picocli.CommandLine.Option;
     " "
 }, mixinStandardHelpOptions = true)
 public class DeleteDIDCommand implements Callable<Integer> {
+  private final String DIDS_URL = "https://cloud.yourserviceva.net/vicidial/admin.php?ADD=1300";
 
   /**
    * Modes supported by the command.
@@ -122,7 +123,7 @@ public class DeleteDIDCommand implements Callable<Integer> {
   @Override
   public Integer call() {
     try {
-      String html = client.getFromWeb("https://cloud.yourserviceva.net/vicidial/admin.php?ADD=1300");
+      String html = client.getFromWeb(DIDS_URL);
       dids = HtmlParser.ParseDIDs(html);
       System.out.println(Ansi.AUTO.text("@|blue Total of #️⃣ " + dids.size() + " DIDs Found.|@"));
 
@@ -280,9 +281,19 @@ public class DeleteDIDCommand implements Callable<Integer> {
       return;
     }
 
-    System.out.println(
+    try {
+      client.removeDID(did.getId());
+      System.out.println(
         Ansi.AUTO.text("@|green ID: " + did.getId() + " DID: " + did.getCallerId() + " removed successfully. |@"));
-
+      
+    } catch (IOException e) {
+      System.out.println(Ansi.AUTO.text("❌ @|red I/O error removing DID ID: " + did.getId() + "|@"));
+    } catch (InterruptedException e) {
+      System.out.println(Ansi.AUTO.text("❌ @|red Removal interrupted for DID ID: " + did.getId() + "|@"));
+      Thread.currentThread().interrupt();
+    } catch (Exception e) {
+      System.out.println(Ansi.AUTO.text("❌ @|red Unexpected error removing DID ID: " + did.getId() + "|@"));
+    }
   }
 
   /**

@@ -25,6 +25,7 @@ public class VicidialClientSingleton {
     private final String source = "java";
     private final String serverIp;
     private final String templateId;
+    private final String serverUrl;
 
     private VicidialClientSingleton(HttpClient client) {
         // Configure the client with a timeout to avoid infinite blocking.
@@ -45,12 +46,14 @@ public class VicidialClientSingleton {
         String sysBase = System.getenv("BASE_URL");
         String sysUser = System.getenv("API_USER");
         String sysPass = System.getenv("API_PASSWORD");
+        String serverUrl = System.getenv("SERVER_URL");
 
         this.baseUrl = (envBase != null && !envBase.isBlank()) ? envBase : sysBase;
         this.apiUser = (envUser != null && !envUser.isBlank()) ? envUser : sysUser;
         this.apiPass = (envPass != null && !envPass.isBlank()) ? envPass : sysPass;
         this.serverIp = (serverIp != null && !serverIp.isBlank()) ? serverIp : serverIp;
         this.templateId = (templateId != null && !templateId.isBlank()) ? templateId : templateId;
+        this.serverUrl = (serverUrl != null && !serverUrl.isBlank()) ? serverUrl : serverUrl;
 
         if (this.baseUrl == null || this.apiUser == null || this.apiPass == null) {
             throw new IllegalStateException(
@@ -331,8 +334,7 @@ public class VicidialClientSingleton {
 
     }
 
-    public String getFromWeb(String URL) throws IOException, InterruptedException{
-        
+    public String getFromWeb(String URL) throws IOException, InterruptedException{      
 
         String originalInput = apiUser +":"+apiPass;
         Base64.Encoder encoder = Base64.getEncoder();
@@ -351,6 +353,24 @@ public class VicidialClientSingleton {
         }
         
         return response.body();
+    }
+
+    public void removeDID(int id) throws IOException, InterruptedException{
+        String originalInput = apiUser +":"+apiPass;
+        Base64.Encoder encoder = Base64.getEncoder();
+        String encodedString = encoder.encodeToString(originalInput.getBytes(StandardCharsets.UTF_8));
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(serverUrl + "?ADD=6311&did_id=" + id + "&CoNfIrM=YES"))
+                .GET()
+                .header("Authorization", "Basic " + encodedString)
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+                .timeout(Duration.ofSeconds(15)) // Request timeout
+                .build();
+        
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            throw new IOException("Error calling the API. Status code: " + response.statusCode());
+        }
     }
 
 }
