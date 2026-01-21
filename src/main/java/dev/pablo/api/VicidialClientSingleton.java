@@ -14,6 +14,28 @@ import dev.pablo.models.LeadModel;
 import io.github.cdimascio.dotenv.Dotenv;
 import picocli.CommandLine.Help.Ansi;
 
+/**
+ * Singleton HTTP client wrapper for interacting with a Vicidial API.
+ *
+ * <p>This class centralizes HTTP interactions required by the CLI:
+ * loading configuration (from .env or system environment), building API URLs
+ * with the required credentials, executing requests and providing higher-level
+ * helper methods for specific Vicidial operations (campaigns, leads, users,
+ * phones, DIDs, etc.).</p>
+ *
+ * <p>Configuration values consumed:
+ * <ul>
+ *   <li>BASE_URL — Base API endpoint</li>
+ *   <li>API_USER — API username</li>
+ *   <li>API_PASSWORD — API password</li>
+ *   <li>SERVER_IP — SIP server IP for phone operations</li>
+ *   <li>TEMPLATE_ID — optional phone template id</li>
+ *   <li>SERVER_URL — secondary web UI URL used for DID operations</li>
+ * </ul>
+ * </p>
+ *
+ * @since 1.0
+ */
 public class VicidialClientSingleton {
 
     public static VicidialClientSingleton instance = null;
@@ -27,6 +49,16 @@ public class VicidialClientSingleton {
     private final String templateId;
     private final String serverUrl;
 
+    /**
+     * Creates a new wrapper instance using the provided HttpClient.
+     *
+     * <p>The constructor loads environment variables using dotenv (if present)
+     * and falls back to system environment variables. It validates that the
+     * mandatory configuration (BASE_URL, API_USER and API_PASSWORD) is present.</p>
+     *
+     * @param client configured HttpClient to use for requests
+     * @throws IllegalStateException if required configuration values are missing
+     */
     private VicidialClientSingleton(HttpClient client) {
         // Configure the client with a timeout to avoid infinite blocking.
         this.client = client;
@@ -61,6 +93,14 @@ public class VicidialClientSingleton {
         }
     }
 
+    /**
+     * Returns the singleton instance, creating it if necessary.
+     *
+     * <p>The instance is lazily initialized with a default HttpClient configured
+     * with a 10 second connection timeout.</p>
+     *
+     * @return the singleton VicidialClientSingleton instance
+     */
     public static VicidialClientSingleton getInstance() {
         if (VicidialClientSingleton.instance == null) {
             HttpClient client = HttpClient.newBuilder()
@@ -72,6 +112,14 @@ public class VicidialClientSingleton {
         return VicidialClientSingleton.instance;
     }
 
+    /**
+     * Builds a full API URL for a given Vicidial function name.
+     *
+     * <p>The returned URL already includes source, user and pass query parameters.</p>
+     *
+     * @param functionName function name expected by the Vicidial API (e.g. "add_user")
+     * @return a full URL string ready to be extended with function-specific parameters
+     */
     private String buildApiUrl(String functionName) {
         // Build the URL using the provided function name
         return new StringBuilder()
@@ -322,7 +370,7 @@ public class VicidialClientSingleton {
                 "&is_webphone=Y" +
                 "&webphone_auto_answer=Y" +
                 "&outbound_cid=" + cid +
-                "&template_id=" + templateId; // optional -> env
+                "&template_id=" + templateId;
 
         String response = executeApiCall(phoneURL);
 
@@ -334,6 +382,14 @@ public class VicidialClientSingleton {
 
     }
 
+    /**
+     * Performs an authenticated GET request against a provided URL using basic auth.
+     *
+     * @param URL full URL to call
+     * @return response body as text
+     * @throws IOException          If an I/O (network) error occurs.
+     * @throws InterruptedException If the thread is interrupted while waiting.
+     */
     public String getFromWeb(String URL) throws IOException, InterruptedException{      
 
         String originalInput = apiUser +":"+apiPass;
@@ -355,6 +411,13 @@ public class VicidialClientSingleton {
         return response.body();
     }
 
+    /**
+     * Removes a DID (Direct Inward Dial) entry using the configured serverUrl.
+     *
+     * @param id numeric DID identifier to be removed
+     * @throws IOException          If an I/O (network) error occurs.
+     * @throws InterruptedException If the thread is interrupted while waiting.
+     */
     public void removeDID(int id) throws IOException, InterruptedException{
         String originalInput = apiUser +":"+apiPass;
         Base64.Encoder encoder = Base64.getEncoder();
