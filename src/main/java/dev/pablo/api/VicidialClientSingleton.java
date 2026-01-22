@@ -178,6 +178,14 @@ public class VicidialClientSingleton {
     }
 
     /**
+     * Safely encodes a string for use in URL query parameters.
+     * Treats null as empty string to avoid URLEncoder throwing NPE.
+     */
+    private String safeEncode(String s) {
+        return URLEncoder.encode((s == null) ? "" : s, StandardCharsets.UTF_8);
+    }
+
+    /**
      * Obtains detailed information for a lead.
      *
      * @param leadId unique identifier of the lead.
@@ -237,16 +245,17 @@ public class VicidialClientSingleton {
                 "&phone_number=" + contactInfo.getPhone_number() +
                 "&phone_code=1" +
                 "&list_id=" + listId +
-                "&first_name=" + URLEncoder.encode(contactInfo.getFirst_name(), StandardCharsets.UTF_8) +
-                "&last_name=" + URLEncoder.encode(contactInfo.getLast_name(), StandardCharsets.UTF_8) +
-                "&address1=" + URLEncoder.encode(contactInfo.getAddress1(), StandardCharsets.UTF_8) +
-                "&address2=" + URLEncoder.encode(contactInfo.getAddress2(), StandardCharsets.UTF_8) +
-                "&address3=" + URLEncoder.encode(contactInfo.getAddress3(), StandardCharsets.UTF_8) +
-                "&city=" + URLEncoder.encode(contactInfo.getCity(), StandardCharsets.UTF_8) +
-                "&state=" + contactInfo.getState() +
-                "&alt_phone=" + contactInfo.getAlt_phone() +
-                "&email=" + contactInfo.getEmail() +
-                "&comments=" + URLEncoder.encode(contactInfo.getComments(), StandardCharsets.UTF_8);
+                "&first_name=" + safeEncode(contactInfo.getFirst_name()) +
+                "&last_name=" + safeEncode(contactInfo.getLast_name()) +
+                "&address1=" + safeEncode(contactInfo.getAddress1()) +
+                "&address2=" + safeEncode(contactInfo.getAddress2()) +
+                "&address3=" + safeEncode(contactInfo.getAddress3()) +
+                "&city=" + safeEncode(contactInfo.getCity()) +
+                "&state=" + safeEncode(contactInfo.getState()) +
+                "&postal_code=" + safeEncode(contactInfo.getPostal_code()) +
+                "&alt_phone=" + safeEncode(contactInfo.getAlt_phone()) +
+                "&email=" + safeEncode(contactInfo.getEmail()) +
+                "&comments=" + safeEncode(contactInfo.getComments());
 
         // Make create request
         System.out.println(Ansi.AUTO.text("@|blue Creating New lead in List Id: " + listId + "...|@"));
