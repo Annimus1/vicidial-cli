@@ -1,4 +1,4 @@
-# vicidial-cli
+![Vicidial-cli](/img/vicidial-cli.png)
 
 A lightweight, scriptable CLI for administering Vicidial instances. Designed for automation and bulk operations, vicidial-cli exposes targeted commands to manage users, phones, leads and DIDs via the Vicidial API and admin pages. Use it for quick inspections, one-off fixes, or to integrate into deployment and maintenance pipelines.
 
