@@ -17,20 +17,23 @@ import picocli.CommandLine.Help.Ansi;
 /**
  * Singleton HTTP client wrapper for interacting with a Vicidial API.
  *
- * <p>This class centralizes HTTP interactions required by the CLI:
+ * <p>
+ * This class centralizes HTTP interactions required by the CLI:
  * loading configuration (from .env or system environment), building API URLs
  * with the required credentials, executing requests and providing higher-level
  * helper methods for specific Vicidial operations (campaigns, leads, users,
- * phones, DIDs, etc.).</p>
+ * phones, DIDs, etc.).
+ * </p>
  *
- * <p>Configuration values consumed:
+ * <p>
+ * Configuration values consumed:
  * <ul>
- *   <li>BASE_URL — Base API endpoint</li>
- *   <li>API_USER — API username</li>
- *   <li>API_PASSWORD — API password</li>
- *   <li>SERVER_IP — SIP server IP for phone operations</li>
- *   <li>TEMPLATE_ID — optional phone template id</li>
- *   <li>SERVER_URL — secondary web UI URL used for DID operations</li>
+ * <li>BASE_URL — Base API endpoint</li>
+ * <li>API_USER — API username</li>
+ * <li>API_PASSWORD — API password</li>
+ * <li>SERVER_IP — SIP server IP for phone operations</li>
+ * <li>TEMPLATE_ID — optional phone template id</li>
+ * <li>SERVER_URL — secondary web UI URL used for DID operations</li>
  * </ul>
  * </p>
  *
@@ -52,9 +55,11 @@ public class VicidialClientSingleton {
     /**
      * Creates a new wrapper instance using the provided HttpClient.
      *
-     * <p>The constructor loads environment variables using dotenv (if present)
+     * <p>
+     * The constructor loads environment variables using dotenv (if present)
      * and falls back to system environment variables. It validates that the
-     * mandatory configuration (BASE_URL, API_USER and API_PASSWORD) is present.</p>
+     * mandatory configuration (BASE_URL, API_USER and API_PASSWORD) is present.
+     * </p>
      *
      * @param client configured HttpClient to use for requests
      * @throws IllegalStateException if required configuration values are missing
@@ -63,7 +68,8 @@ public class VicidialClientSingleton {
         // Configure the client with a timeout to avoid infinite blocking.
         this.client = client;
 
-        // Load variables from .env if present, otherwise use system environment variables.
+        // Load variables from .env if present, otherwise use system environment
+        // variables.
         Dotenv dotenv = Dotenv.configure()
                 .directory(".")
                 .ignoreIfMissing()
@@ -89,15 +95,17 @@ public class VicidialClientSingleton {
 
         if (this.baseUrl == null || this.apiUser == null || this.apiPass == null) {
             throw new IllegalStateException(
-                "Missing credentials: define BASE_URL, API_USER and API_PASSWORD in .env or environment variables.");
+                    "Missing credentials: define BASE_URL, API_USER and API_PASSWORD in .env or environment variables.");
         }
     }
 
     /**
      * Returns the singleton instance, creating it if necessary.
      *
-     * <p>The instance is lazily initialized with a default HttpClient configured
-     * with a 10 second connection timeout.</p>
+     * <p>
+     * The instance is lazily initialized with a default HttpClient configured
+     * with a 10 second connection timeout.
+     * </p>
      *
      * @return the singleton VicidialClientSingleton instance
      */
@@ -115,10 +123,14 @@ public class VicidialClientSingleton {
     /**
      * Builds a full API URL for a given Vicidial function name.
      *
-     * <p>The returned URL already includes source, user and pass query parameters.</p>
+     * <p>
+     * The returned URL already includes source, user and pass query parameters.
+     * </p>
      *
-     * @param functionName function name expected by the Vicidial API (e.g. "add_user")
-     * @return a full URL string ready to be extended with function-specific parameters
+     * @param functionName function name expected by the Vicidial API (e.g.
+     *                     "add_user")
+     * @return a full URL string ready to be extended with function-specific
+     *         parameters
      */
     private String buildApiUrl(String functionName) {
         // Build the URL using the provided function name
@@ -194,11 +206,13 @@ public class VicidialClientSingleton {
     }
 
     /**
-     * Creates a new contact based on an existing one and places it in a specific list. You can overwrite comments
+     * Creates a new contact based on an existing one and places it in a specific
+     * list. You can overwrite comments
      * and/or the email address.
      *
      * @param leadId   Unique identifier of the lead to duplicate.
-     * @param listId   Unique identifier of the list where the new lead will be placed.
+     * @param listId   Unique identifier of the list where the new lead will be
+     *                 placed.
      * @param comments Notes to be added (Default "").
      * @param email    Email to overwrite (Default "").
      * @throws IOException          If an I/O (network) error occurs.
@@ -298,7 +312,8 @@ public class VicidialClientSingleton {
      *
      * @param ID       Phone identifier.
      * @param password New password (Default "").
-     * @throws IOException          When an error occurs updating the Phone, or when password is not provided.
+     * @throws IOException          When an error occurs updating the Phone, or when
+     *                              password is not provided.
      * @throws InterruptedException When the thread is interrupted while waiting.
      */
     public void updatePhone(String ID, String password) throws IOException, InterruptedException {
@@ -327,7 +342,8 @@ public class VicidialClientSingleton {
      * @param ID        Unique identifier for the User; will be used as Login.
      * @param password  Password for the user, used for Login.
      * @param name      User's display name, used in reports.
-     * @param userGroup Identifier of the Usergroup, used to assign the user to a campaign.
+     * @param userGroup Identifier of the Usergroup, used to assign the user to a
+     *                  campaign.
      * @throws IOException          When an error occurs creating the User.
      * @throws InterruptedException When the thread is interrupted while waiting.
      */
@@ -383,31 +399,33 @@ public class VicidialClientSingleton {
     }
 
     /**
-     * Performs an authenticated GET request against a provided URL using basic auth.
+     * Performs an authenticated GET request against a provided URL using basic
+     * auth.
      *
      * @param URL full URL to call
      * @return response body as text
      * @throws IOException          If an I/O (network) error occurs.
      * @throws InterruptedException If the thread is interrupted while waiting.
      */
-    public String getFromWeb(String URL) throws IOException, InterruptedException{      
+    public String getFromWeb(String URL) throws IOException, InterruptedException {
 
-        String originalInput = apiUser +":"+apiPass;
+        String originalInput = apiUser + ":" + apiPass;
         Base64.Encoder encoder = Base64.getEncoder();
         String encodedString = encoder.encodeToString(originalInput.getBytes(StandardCharsets.UTF_8));
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(URL))
                 .GET()
                 .header("Authorization", "Basic " + encodedString)
-                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+                .header("Accept",
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
                 .timeout(Duration.ofSeconds(15)) // Request timeout
                 .build();
-        
+
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             throw new IOException("Error calling the API. Status code: " + response.statusCode());
         }
-        
+
         return response.body();
     }
 
@@ -418,22 +436,41 @@ public class VicidialClientSingleton {
      * @throws IOException          If an I/O (network) error occurs.
      * @throws InterruptedException If the thread is interrupted while waiting.
      */
-    public void removeDID(int id) throws IOException, InterruptedException{
-        String originalInput = apiUser +":"+apiPass;
+    public void removeDID(int id) throws IOException, InterruptedException {
+        String originalInput = apiUser + ":" + apiPass;
         Base64.Encoder encoder = Base64.getEncoder();
         String encodedString = encoder.encodeToString(originalInput.getBytes(StandardCharsets.UTF_8));
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(serverUrl + "?ADD=6311&did_id=" + id + "&CoNfIrM=YES"))
                 .GET()
                 .header("Authorization", "Basic " + encodedString)
-                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+                .header("Accept",
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
                 .timeout(Duration.ofSeconds(15)) // Request timeout
                 .build();
-        
+
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             throw new IOException("Error calling the API. Status code: " + response.statusCode());
         }
     }
 
+    public void updateCampaignStatus(String campaignId, String active) throws IOException, InterruptedException {
+        // &campaign_id=TESTOUT&active=N
+        String url = buildApiUrl("update_campaign") + "&campaign_id=" + campaignId + "&active=" + active;
+
+        String response = executeApiCall(url);
+
+        if (response.contains("ERROR")) {
+            System.err.println(Ansi.AUTO.text("❌ @|red Error while updating the campaign: .|@" + response));
+
+        }
+        if (response.contains("NOTICE")) {
+            System.err.println(Ansi.AUTO.text("⚠️ @|yellow No updates defined on this campaign.|@"));
+
+        }
+        if (response.contains("SUCCESS")) {
+            System.err.println(Ansi.AUTO.text("✅ @|green Campaign has been updated.|@"));
+        }
+    }
 }
