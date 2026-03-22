@@ -604,4 +604,79 @@ public class VicidialClientSingleton {
 
     }
 
+    public void createInboundGroup(String inboundName, String inboundDescription, String groupID) throws IOException, InterruptedException{
+        if (groupID.isEmpty()) {
+            groupID = "---ALL---";
+        }
+        
+        // 1. Configurar el cliente con gestión de cookies para mantener la sesión PHPSESSID
+        CookieManager cookieManager = new CookieManager();
+        HttpClient sessionClient = HttpClient.newBuilder()
+                .cookieHandler(cookieManager)
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+
+        // 2. Preparar credenciales y limpiar el ID del grupo
+        String cleanGroupId = inboundName.toLowerCase().trim().replaceAll(" ", "%20");
+        String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
+
+        // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el servidor
+        HttpRequest step1 = HttpRequest.newBuilder()
+                .uri(URI.create(serverUrl + "?ADD=1111"))
+                .header("Authorization", "Basic " + auth)
+                .header("User-Agent", "Mozilla/5.0")
+                .GET()
+                .build();
+        
+        sessionClient.send(step1, HttpResponse.BodyHandlers.ofString());
+
+        // PASO 2: Preparar los datos del POST
+        Map<String, String> formData = new LinkedHashMap<>();
+        formData.put("ADD", "2111");            // Acción de procesar inserción
+        formData.put("DB", "0");                   // Base de datos (requerido por admin.php)
+        formData.put("group_id", cleanGroupId + "Inb");  
+        formData.put("group_name", inboundDescription);   
+        formData.put("group_color","#FF00FF");
+        formData.put("active", "Y");
+        formData.put("user_group", groupID);
+        formData.put("web_form_address", "");
+        formData.put("voicemail_ext", "");
+        formData.put("next_agent_call", "oldest_call_finish");
+        formData.put("fronter_display", "Y");
+        formData.put("script_id", "NONE");
+        formData.put("get_call_launch", "NONE");
+        formData.put("group_handling", "PHONE");
+        formData.put("SUBMIT", "SUBMIT");          
+
+        String formBody = formData.entrySet().stream()
+                .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" +
+                        URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                .collect(Collectors.joining("&"));
+
+        // PASO 3: Enviar la petición POST
+        HttpRequest step2 = HttpRequest.newBuilder()
+                .uri(URI.create(serverUrl)) // Se envía a admin.php
+                .header("Authorization", "Basic " + auth)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("Referer", serverUrl + "?ADD=196111111111") // Indispensable para Vicidial
+                .header("User-Agent", "Mozilla/5.0")
+                .POST(HttpRequest.BodyPublishers.ofString(formBody))
+                .build();
+
+        HttpResponse<String> response = sessionClient.send(step2, HttpResponse.BodyHandlers.ofString());
+        String responseBody = response.body();
+
+        System.out.println("name: " + cleanGroupId);
+        System.out.println("name: " + inboundName);
+        System.out.println(response.statusCode());
+        // 3. Validación de respuesta
+        if (responseBody.contains("GROUP ADDED") || responseBody.contains("has been added")) {
+            System.out.println("✅ Success: The CID group '" + cleanGroupId + "Inb' has been successfully created.");
+        } else if (responseBody.contains("GROUP NOT ADDED")) {
+            System.err.println("⚠️ Error: The CID group '" + cleanGroupId + "Inb' already exists.");
+        } else {
+            System.err.println("❌ Creation failed. The server rejected the request.");
+            throw new InterruptedException("❌ Creation failed. The server rejected the request.");
+        }
+    }
 }
