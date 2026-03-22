@@ -1,6 +1,7 @@
 package dev.pablo.api;
 
 import java.io.IOException;
+import java.net.CookieManager;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -9,6 +10,9 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import dev.pablo.models.LeadModel;
 import io.github.cdimascio.dotenv.Dotenv;
@@ -473,4 +477,67 @@ public class VicidialClientSingleton {
             System.err.println(Ansi.AUTO.text("✅ @|green Campaign has been updated.|@"));
         }
     }
+
+    public void createUserGroup(String groupName, String description) throws IOException, InterruptedException {
+        // 1. Configurar el cliente con gestión de cookies para mantener la sesión PHPSESSID
+        CookieManager cookieManager = new CookieManager();
+        HttpClient sessionClient = HttpClient.newBuilder()
+                .cookieHandler(cookieManager)
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+
+        // 2. Preparar credenciales y limpiar el ID del grupo
+        String cleanGroupId = groupName.toLowerCase().trim().replaceAll("[^A-Z0-9]", "");
+        String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
+
+        // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el servidor
+        HttpRequest step1 = HttpRequest.newBuilder()
+                .uri(URI.create(serverUrl + "?ADD=111111"))
+                .header("Authorization", "Basic " + auth)
+                .header("User-Agent", "Mozilla/5.0")
+                .GET()
+                .build();
+        
+        sessionClient.send(step1, HttpResponse.BodyHandlers.ofString());
+
+        // PASO 2: Preparar los datos del POST
+        Map<String, String> formData = new LinkedHashMap<>();
+        formData.put("ADD", "211111");            // Acción de procesar inserción
+        formData.put("DB", "0");                   // Base de datos (requerido por admin.php)
+        formData.put("user_group", cleanGroupId);  // ID del grupo
+        formData.put("group_name", description);   // Descripción
+        formData.put("SUBMIT", "SUBMIT");          // Simulación de clic en botón
+
+        String formBody = formData.entrySet().stream()
+                .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" +
+                        URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                .collect(Collectors.joining("&"));
+
+        // PASO 3: Enviar la petición POST
+        HttpRequest step2 = HttpRequest.newBuilder()
+                .uri(URI.create(serverUrl)) // Se envía a admin.php
+                .header("Authorization", "Basic " + auth)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("Referer", serverUrl + "?ADD=111111") // Indispensable para Vicidial
+                .header("User-Agent", "Mozilla/5.0")
+                .POST(HttpRequest.BodyPublishers.ofString(formBody))
+                .build();
+
+        HttpResponse<String> response = sessionClient.send(step2, HttpResponse.BodyHandlers.ofString());
+        String responseBody = response.body();
+
+        // 3. Validación de respuesta
+        if (responseBody.contains("USER GROUP ADDED") || responseBody.contains("has been added")) {
+            System.out.println("✅ Success: The group '" + cleanGroupId + "' has been successfully created.");
+        } else if (responseBody.contains("USER GROUP NOT ADDED")) {
+            System.err.println("⚠️ Error: The group '" + cleanGroupId + "' already exists.");
+        } else {
+            System.err.println("❌ Creation failed. The server rejected the request.");
+            throw new InterruptedException("❌ Creation failed. The server rejected the request.");
+        }
+    }
+
+    
+
+
 }
