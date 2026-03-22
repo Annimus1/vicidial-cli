@@ -537,7 +537,71 @@ public class VicidialClientSingleton {
         }
     }
 
-    
+    public void createCIDGroup(String CidName, String cidDescription) throws IOException, InterruptedException{
 
+        // 1. Configurar el cliente con gestión de cookies para mantener la sesión PHPSESSID
+        CookieManager cookieManager = new CookieManager();
+        HttpClient sessionClient = HttpClient.newBuilder()
+                .cookieHandler(cookieManager)
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+
+        // 2. Preparar credenciales y limpiar el ID del grupo
+        String cleanGroupId = CidName.toLowerCase().trim().replaceAll(" ", "%20");
+        String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
+
+        // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el servidor
+        HttpRequest step1 = HttpRequest.newBuilder()
+                .uri(URI.create(serverUrl + "?ADD=196111111111"))
+                .header("Authorization", "Basic " + auth)
+                .header("User-Agent", "Mozilla/5.0")
+                .GET()
+                .build();
+        
+        sessionClient.send(step1, HttpResponse.BodyHandlers.ofString());
+
+        // PASO 2: Preparar los datos del POST
+        Map<String, String> formData = new LinkedHashMap<>();
+        formData.put("ADD", "296111111111");            // Acción de procesar inserción
+        formData.put("DB", "0");                   // Base de datos (requerido por admin.php)
+        formData.put("cid_group_id", cleanGroupId + "CID");  // ID del grupo
+        formData.put("cid_group_notes", cidDescription);   // Descripción
+        formData.put("cid_group_type","NONE");
+        formData.put("user_group", "---ALL---");
+        formData.put("SUBMIT", "SUBMIT");          // Simulación de clic en botón
+
+        String formBody = formData.entrySet().stream()
+                .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" +
+                        URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                .collect(Collectors.joining("&"));
+
+        // PASO 3: Enviar la petición POST
+        HttpRequest step2 = HttpRequest.newBuilder()
+                .uri(URI.create(serverUrl)) // Se envía a admin.php
+                .header("Authorization", "Basic " + auth)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("Referer", serverUrl + "?ADD=196111111111") // Indispensable para Vicidial
+                .header("User-Agent", "Mozilla/5.0")
+                .POST(HttpRequest.BodyPublishers.ofString(formBody))
+                .build();
+
+        HttpResponse<String> response = sessionClient.send(step2, HttpResponse.BodyHandlers.ofString());
+        String responseBody = response.body();
+
+        System.out.println("name: " + cleanGroupId);
+        System.out.println("name: " + CidName);
+        System.out.println(response.statusCode());
+        // 3. Validación de respuesta
+        if (responseBody.contains("CID GROUP ADDED") || responseBody.contains("has been added")) {
+            System.out.println("✅ Success: The CID group '" + cleanGroupId + "' has been successfully created.");
+        } else if (responseBody.contains("CID GROUP NOT ADDED")) {
+            System.err.println("⚠️ Error: The CID group '" + cleanGroupId + "' already exists.");
+        } else {
+            System.err.println("❌ Creation failed. The server rejected the request.");
+            throw new InterruptedException("❌ Creation failed. The server rejected the request.");
+        }
+
+
+    }
 
 }
