@@ -9,12 +9,22 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+
 import dev.pablo.models.LeadModel;
+import dev.pablo.models.ListModel;
 import io.github.cdimascio.dotenv.Dotenv;
 import picocli.CommandLine.Help.Ansi;
 
@@ -479,7 +489,8 @@ public class VicidialClientSingleton {
     }
 
     public void createUserGroup(String groupName, String description) throws IOException, InterruptedException {
-        // 1. Configurar el cliente con gestión de cookies para mantener la sesión PHPSESSID
+        // 1. Configurar el cliente con gestión de cookies para mantener la sesión
+        // PHPSESSID
         CookieManager cookieManager = new CookieManager();
         HttpClient sessionClient = HttpClient.newBuilder()
                 .cookieHandler(cookieManager)
@@ -490,23 +501,24 @@ public class VicidialClientSingleton {
         String cleanGroupId = groupName.toLowerCase().trim().replaceAll("[^A-Z0-9]", "");
         String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
 
-        // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el servidor
+        // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el
+        // servidor
         HttpRequest step1 = HttpRequest.newBuilder()
                 .uri(URI.create(serverUrl + "?ADD=111111"))
                 .header("Authorization", "Basic " + auth)
                 .header("User-Agent", "Mozilla/5.0")
                 .GET()
                 .build();
-        
+
         sessionClient.send(step1, HttpResponse.BodyHandlers.ofString());
 
         // PASO 2: Preparar los datos del POST
         Map<String, String> formData = new LinkedHashMap<>();
-        formData.put("ADD", "211111");            // Acción de procesar inserción
-        formData.put("DB", "0");                   // Base de datos (requerido por admin.php)
-        formData.put("user_group", cleanGroupId);  // ID del grupo
-        formData.put("group_name", description);   // Descripción
-        formData.put("SUBMIT", "SUBMIT");          // Simulación de clic en botón
+        formData.put("ADD", "211111"); // Acción de procesar inserción
+        formData.put("DB", "0"); // Base de datos (requerido por admin.php)
+        formData.put("user_group", cleanGroupId); // ID del grupo
+        formData.put("group_name", description); // Descripción
+        formData.put("SUBMIT", "SUBMIT"); // Simulación de clic en botón
 
         String formBody = formData.entrySet().stream()
                 .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" +
@@ -537,9 +549,10 @@ public class VicidialClientSingleton {
         }
     }
 
-    public void createCIDGroup(String CidName, String cidDescription) throws IOException, InterruptedException{
+    public void createCIDGroup(String CidName, String cidDescription) throws IOException, InterruptedException {
 
-        // 1. Configurar el cliente con gestión de cookies para mantener la sesión PHPSESSID
+        // 1. Configurar el cliente con gestión de cookies para mantener la sesión
+        // PHPSESSID
         CookieManager cookieManager = new CookieManager();
         HttpClient sessionClient = HttpClient.newBuilder()
                 .cookieHandler(cookieManager)
@@ -550,25 +563,26 @@ public class VicidialClientSingleton {
         String cleanGroupId = CidName.toLowerCase().trim().replaceAll(" ", "%20");
         String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
 
-        // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el servidor
+        // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el
+        // servidor
         HttpRequest step1 = HttpRequest.newBuilder()
                 .uri(URI.create(serverUrl + "?ADD=196111111111"))
                 .header("Authorization", "Basic " + auth)
                 .header("User-Agent", "Mozilla/5.0")
                 .GET()
                 .build();
-        
+
         sessionClient.send(step1, HttpResponse.BodyHandlers.ofString());
 
         // PASO 2: Preparar los datos del POST
         Map<String, String> formData = new LinkedHashMap<>();
-        formData.put("ADD", "296111111111");            // Acción de procesar inserción
-        formData.put("DB", "0");                   // Base de datos (requerido por admin.php)
-        formData.put("cid_group_id", cleanGroupId + "CID");  // ID del grupo
-        formData.put("cid_group_notes", cidDescription);   // Descripción
-        formData.put("cid_group_type","NONE");
+        formData.put("ADD", "296111111111"); // Acción de procesar inserción
+        formData.put("DB", "0"); // Base de datos (requerido por admin.php)
+        formData.put("cid_group_id", cleanGroupId + "CID"); // ID del grupo
+        formData.put("cid_group_notes", cidDescription); // Descripción
+        formData.put("cid_group_type", "NONE");
         formData.put("user_group", "---ALL---");
-        formData.put("SUBMIT", "SUBMIT");          // Simulación de clic en botón
+        formData.put("SUBMIT", "SUBMIT"); // Simulación de clic en botón
 
         String formBody = formData.entrySet().stream()
                 .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" +
@@ -601,15 +615,16 @@ public class VicidialClientSingleton {
             throw new InterruptedException("❌ Creation failed. The server rejected the request.");
         }
 
-
     }
 
-    public void createInboundGroup(String inboundName, String inboundDescription, String groupID) throws IOException, InterruptedException{
+    public void createInboundGroup(String inboundName, String inboundDescription, String groupID)
+            throws IOException, InterruptedException {
         if (groupID.isEmpty()) {
             groupID = "---ALL---";
         }
-        
-        // 1. Configurar el cliente con gestión de cookies para mantener la sesión PHPSESSID
+
+        // 1. Configurar el cliente con gestión de cookies para mantener la sesión
+        // PHPSESSID
         CookieManager cookieManager = new CookieManager();
         HttpClient sessionClient = HttpClient.newBuilder()
                 .cookieHandler(cookieManager)
@@ -620,23 +635,24 @@ public class VicidialClientSingleton {
         String cleanGroupId = inboundName.toLowerCase().trim().replaceAll(" ", "%20");
         String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
 
-        // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el servidor
+        // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el
+        // servidor
         HttpRequest step1 = HttpRequest.newBuilder()
                 .uri(URI.create(serverUrl + "?ADD=1111"))
                 .header("Authorization", "Basic " + auth)
                 .header("User-Agent", "Mozilla/5.0")
                 .GET()
                 .build();
-        
+
         sessionClient.send(step1, HttpResponse.BodyHandlers.ofString());
 
         // PASO 2: Preparar los datos del POST
         Map<String, String> formData = new LinkedHashMap<>();
-        formData.put("ADD", "2111");            // Acción de procesar inserción
-        formData.put("DB", "0");                   // Base de datos (requerido por admin.php)
-        formData.put("group_id", cleanGroupId + "Inb");  
-        formData.put("group_name", inboundDescription);   
-        formData.put("group_color","#FF00FF");
+        formData.put("ADD", "2111"); // Acción de procesar inserción
+        formData.put("DB", "0"); // Base de datos (requerido por admin.php)
+        formData.put("group_id", cleanGroupId + "Inb");
+        formData.put("group_name", inboundDescription);
+        formData.put("group_color", "#FF00FF");
         formData.put("active", "Y");
         formData.put("user_group", groupID);
         formData.put("web_form_address", "");
@@ -646,7 +662,7 @@ public class VicidialClientSingleton {
         formData.put("script_id", "NONE");
         formData.put("get_call_launch", "NONE");
         formData.put("group_handling", "PHONE");
-        formData.put("SUBMIT", "SUBMIT");          
+        formData.put("SUBMIT", "SUBMIT");
 
         String formBody = formData.entrySet().stream()
                 .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" +
@@ -678,5 +694,87 @@ public class VicidialClientSingleton {
             System.err.println("❌ Creation failed. The server rejected the request.");
             throw new InterruptedException("❌ Creation failed. The server rejected the request.");
         }
+    }
+
+    /**
+     * Retrieves all available lists from the Vicidial system.
+     *
+     * <p>
+     * This method performs an HTTP GET request to the Vicidial admin interface
+     * to fetch the list of all lists. It parses the HTML response using Jsoup
+     * and extracts relevant information such as list ID, name, description,
+     * active status, and associated campaign into ListModel objects.
+     * </p>
+     *
+     * @return a list of ListModel objects representing all available lists
+     * @throws IOException          if an I/O error occurs during the HTTP request
+     * @throws InterruptedException if the thread is interrupted while waiting for
+     *                              the response
+     */
+    public List<ListModel> getAllLists() throws IOException, InterruptedException {
+        String LIST_URL = "https://cloud.yourserviceva.net/vicidial/admin.php?ADD=100";
+
+        String response = this.getFromWeb(LIST_URL);
+        List<ListModel> lists = new ArrayList<>();
+        Document doc = Jsoup.parse(response);
+
+        // Seleccionamos las filas que tienen las clases de la lista de registros
+        Elements rows = doc.select("tr.records_list_x, tr.records_list_y");
+
+        for (Element row : rows) {
+            Elements cols = row.select("td");
+
+            if (cols.size() >= 9) {
+                // Extraemos el texto limpiando espacios en blanco sobrantes
+                String id = cols.get(0).text().trim();
+                String name = cols.get(1).text().trim();
+                String description = cols.get(2).text().trim();
+                String active = cols.get(6).text().trim();
+                String campaign = cols.get(8).text().trim();
+
+                lists.add(new ListModel(Integer.parseInt(id), name, description, active, campaign));
+            }
+        }
+
+        return lists;
+    }
+
+    /**
+     * Determines the next available list ID based on the current lists.
+     *
+     * <p>
+     * This method finds the list with the highest ID from the provided list
+     * and returns the next sequential ID. If the list is empty, it returns -1.
+     * </p>
+     *
+     * @param currentLists the list of existing ListModel objects
+     * @return the next available list ID, or -1 if the input list is empty
+     */
+    public int getNextListId(List<ListModel> currentLists) {
+
+        if (currentLists.size() < 1) {
+            return -1;
+            // TODO : Create a custom List Error "unable to figure the id of the list".
+        }
+
+        ListModel currentId = Collections.max(currentLists, Comparator.comparingInt(ListModel::getListId));
+
+        return currentId.getListId() + 1;
+    }
+
+    public String createList(String listId, String listName, String listDescription) {
+
+        try {
+            if (listId == null) {
+                List<ListModel> currentLists = this.getAllLists();
+                listId = String.valueOf(this.getNextListId(currentLists));
+            }
+
+            return listId;
+        } catch (Exception e) {
+            // TODO: handle exception
+            return null;
+        }
+
     }
 }
