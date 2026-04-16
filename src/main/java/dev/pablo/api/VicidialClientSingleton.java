@@ -762,12 +762,44 @@ public class VicidialClientSingleton {
         return currentId.getListId() + 1;
     }
 
-    public String createList(String listId, String listName, String listDescription) {
+    /**
+     * Creates a new list in the Vicidial system.
+     *
+     * <p>This method creates a new list with the specified name, description, and campaign ID.
+     * If the listId is null, it automatically determines the next available list ID by
+     * retrieving all existing lists and finding the highest ID, then incrementing it.</p>
+     *
+     * @param listId the unique identifier for the list; if null, the next available ID will be used
+     * @param listName the name of the list to be created
+     * @param listDescription the description of the list
+     * @param campaignId the ID of the campaign to associate the list with
+     * @return the ID of the created list, or null if creation failed
+     * @throws InterruptedException if the list already exists or if an error occurs during creation
+     */
+    public String createList(String listId, String listName, String listDescription, String campaignId) {
 
         try {
             if (listId == null) {
                 List<ListModel> currentLists = this.getAllLists();
                 listId = String.valueOf(this.getNextListId(currentLists));
+            }
+
+            String API_URL = this.buildApiUrl("add_list") + "&list_id=" + listId
+                    + "&list_name=" + URLEncoder.encode(listName, StandardCharsets.UTF_8)
+                    + "&campaign_id=" + URLEncoder.encode(campaignId, StandardCharsets.UTF_8)
+                    + "&list_description=" + URLEncoder.encode(listDescription, StandardCharsets.UTF_8);
+
+            // Make create request
+            System.out.println(Ansi.AUTO.text("@|blue Creating New list: " + listId + "...|@"));
+            String response = this.executeApiCall(API_URL);
+
+            if (response.contains("ALREADY")) {
+                System.out.println(Ansi.AUTO.text("@|red 🔴 ERROR: add_list LIST ALREADY EXISTS |@"));
+                throw new InterruptedException("Fail while creating new List (Already Exists).");
+            }
+
+            if (response.contains("SUCCESS")) {
+                System.out.println(Ansi.AUTO.text("@|green ✅ SUCCESS: add_list LIST HAS BEEN ADDED - " + listId + "|@"));
             }
 
             return listId;
@@ -777,4 +809,5 @@ public class VicidialClientSingleton {
         }
 
     }
+
 }
