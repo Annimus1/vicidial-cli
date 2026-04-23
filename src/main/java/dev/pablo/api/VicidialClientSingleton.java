@@ -25,6 +25,7 @@ import org.jsoup.select.Elements;
 
 import dev.pablo.models.LeadModel;
 import dev.pablo.models.ListModel;
+import dev.pablo.models.UserGroupModel;
 import io.github.cdimascio.dotenv.Dotenv;
 import picocli.CommandLine.Help.Ansi;
 
@@ -488,7 +489,7 @@ public class VicidialClientSingleton {
         }
     }
 
-    public void createUserGroup(String groupName, String description) throws IOException, InterruptedException {
+    public String createUserGroup(String groupName, String description) throws IOException, InterruptedException {
         // 1. Configurar el cliente con gestión de cookies para mantener la sesión
         // PHPSESSID
         CookieManager cookieManager = new CookieManager();
@@ -498,9 +499,8 @@ public class VicidialClientSingleton {
                 .build();
 
         // 2. Preparar credenciales y limpiar el ID del grupo
-        String cleanGroupId = groupName.toLowerCase().trim().replaceAll("[^A-Z0-9]", "");
+        String cleanGroupId = groupName.toLowerCase().trim();
         String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
-
         // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el
         // servidor
         HttpRequest step1 = HttpRequest.newBuilder()
@@ -541,15 +541,78 @@ public class VicidialClientSingleton {
         // 3. Validación de respuesta
         if (responseBody.contains("USER GROUP ADDED") || responseBody.contains("has been added")) {
             System.out.println("✅ Success: The group '" + cleanGroupId + "' has been successfully created.");
+            return cleanGroupId;
         } else if (responseBody.contains("USER GROUP NOT ADDED")) {
             System.err.println("⚠️ Error: The group '" + cleanGroupId + "' already exists.");
+            System.out.println("name: " + groupName);
+            System.out.println("descripcion: " + description);
+            throw new InterruptedException("❌ Creation failed. The Group already exists.");
         } else {
             System.err.println("❌ Creation failed. The server rejected the request.");
             throw new InterruptedException("❌ Creation failed. The server rejected the request.");
         }
     }
 
-    public void createCIDGroup(String CidName, String cidDescription) throws IOException, InterruptedException {
+    public List<UserGroupModel> listUserGroups() throws IOException, InterruptedException {
+
+        List<UserGroupModel> groups = new ArrayList<>();
+        String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
+
+        // URL proporcionada para listar grupos
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(serverUrl + "?ADD=100000"))
+                .header("Authorization", "Basic " + auth)
+                .header("User-Agent", "Mozilla/5.0")
+                .GET()
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        Document doc = Jsoup.parse(response.body());
+
+        // Seleccionamos las filas que contienen los datos de los grupos
+        Elements rows = doc.select("tr.records_list_x, tr.records_list_y");
+
+        for (Element row : rows) {
+            Elements cols = row.select("td");
+
+            // Estructura de tu tabla:
+            // 0: USER GROUP (ID) | 1: GROUP NAME | 2: USERS | 3: ACTIVE
+            if (cols.size() >= 4) {
+                groups.add(new UserGroupModel(
+                        cols.get(0).text().trim(),
+                        cols.get(1).text().trim(),
+                        cols.get(3).text().trim() // ACTIVE está en la posición 3 según tu HTML
+                ));
+            }
+        }
+
+        // Mostrar resultados por consola
+        if (groups.isEmpty()) {
+            System.out.println("No se encontraron registros en la tabla.");
+            return null;
+        } else {
+            return groups;
+        }
+    }
+
+    public Boolean isValidUserGroup(String groupName) throws IOException, InterruptedException{
+        
+        if(groupName.isBlank()){
+            return false;
+        }
+
+        List<UserGroupModel> groups = this.listUserGroups();
+
+        for (UserGroupModel userGroupModel : groups) {
+            if( userGroupModel.getId().toLowerCase().equals(groupName.toLowerCase().trim())){
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public String createCIDGroup(String CidName, String cidDescription) throws IOException, InterruptedException {
 
         // 1. Configurar el cliente con gestión de cookies para mantener la sesión
         // PHPSESSID
@@ -560,7 +623,7 @@ public class VicidialClientSingleton {
                 .build();
 
         // 2. Preparar credenciales y limpiar el ID del grupo
-        String cleanGroupId = CidName.toLowerCase().trim().replaceAll(" ", "%20");
+        String cleanGroupId = CidName.toLowerCase().trim().replaceAll(" ", "%20") + "CID";
         String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
 
         // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el
@@ -578,7 +641,7 @@ public class VicidialClientSingleton {
         Map<String, String> formData = new LinkedHashMap<>();
         formData.put("ADD", "296111111111"); // Acción de procesar inserción
         formData.put("DB", "0"); // Base de datos (requerido por admin.php)
-        formData.put("cid_group_id", cleanGroupId + "CID"); // ID del grupo
+        formData.put("cid_group_id", cleanGroupId); // ID del grupo
         formData.put("cid_group_notes", cidDescription); // Descripción
         formData.put("cid_group_type", "NONE");
         formData.put("user_group", "---ALL---");
@@ -608,8 +671,10 @@ public class VicidialClientSingleton {
         // 3. Validación de respuesta
         if (responseBody.contains("CID GROUP ADDED") || responseBody.contains("has been added")) {
             System.out.println("✅ Success: The CID group '" + cleanGroupId + "' has been successfully created.");
+            return cleanGroupId;
         } else if (responseBody.contains("CID GROUP NOT ADDED")) {
             System.err.println("⚠️ Error: The CID group '" + cleanGroupId + "' already exists.");
+            throw new InterruptedException("❌ Creation failed. The CID already exists.");
         } else {
             System.err.println("❌ Creation failed. The server rejected the request.");
             throw new InterruptedException("❌ Creation failed. The server rejected the request.");
@@ -617,7 +682,7 @@ public class VicidialClientSingleton {
 
     }
 
-    public void createInboundGroup(String inboundName, String inboundDescription, String groupID)
+    public String createInboundGroup(String inboundName, String inboundDescription, String groupID)
             throws IOException, InterruptedException {
         if (groupID.isEmpty()) {
             groupID = "---ALL---";
@@ -632,7 +697,7 @@ public class VicidialClientSingleton {
                 .build();
 
         // 2. Preparar credenciales y limpiar el ID del grupo
-        String cleanGroupId = inboundName.toLowerCase().trim().replaceAll(" ", "%20");
+        String cleanGroupId = inboundName.toLowerCase().trim().replaceAll(" ", "%20") + "Inb";
         String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
 
         // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el
@@ -650,7 +715,7 @@ public class VicidialClientSingleton {
         Map<String, String> formData = new LinkedHashMap<>();
         formData.put("ADD", "2111"); // Acción de procesar inserción
         formData.put("DB", "0"); // Base de datos (requerido por admin.php)
-        formData.put("group_id", cleanGroupId + "Inb");
+        formData.put("group_id", cleanGroupId);
         formData.put("group_name", inboundDescription);
         formData.put("group_color", "#FF00FF");
         formData.put("active", "Y");
@@ -682,14 +747,14 @@ public class VicidialClientSingleton {
         HttpResponse<String> response = sessionClient.send(step2, HttpResponse.BodyHandlers.ofString());
         String responseBody = response.body();
 
-        System.out.println("name: " + cleanGroupId);
-        System.out.println("name: " + inboundName);
         System.out.println(response.statusCode());
         // 3. Validación de respuesta
         if (responseBody.contains("GROUP ADDED") || responseBody.contains("has been added")) {
-            System.out.println("✅ Success: The CID group '" + cleanGroupId + "Inb' has been successfully created.");
+            System.out.println("✅ Success: The CID group '" + cleanGroupId + "' has been successfully created.");
+            return cleanGroupId;
         } else if (responseBody.contains("GROUP NOT ADDED")) {
             System.err.println("⚠️ Error: The CID group '" + cleanGroupId + "Inb' already exists.");
+            throw new InterruptedException("❌ Creation failed. The inbound group already exists.");
         } else {
             System.err.println("❌ Creation failed. The server rejected the request.");
             throw new InterruptedException("❌ Creation failed. The server rejected the request.");
@@ -765,16 +830,23 @@ public class VicidialClientSingleton {
     /**
      * Creates a new list in the Vicidial system.
      *
-     * <p>This method creates a new list with the specified name, description, and campaign ID.
-     * If the listId is null, it automatically determines the next available list ID by
-     * retrieving all existing lists and finding the highest ID, then incrementing it.</p>
+     * <p>
+     * This method creates a new list with the specified name, description, and
+     * campaign ID.
+     * If the listId is null, it automatically determines the next available list ID
+     * by
+     * retrieving all existing lists and finding the highest ID, then incrementing
+     * it.
+     * </p>
      *
-     * @param listId the unique identifier for the list; if null, the next available ID will be used
-     * @param listName the name of the list to be created
+     * @param listId          the unique identifier for the list; if null, the next
+     *                        available ID will be used
+     * @param listName        the name of the list to be created
      * @param listDescription the description of the list
-     * @param campaignId the ID of the campaign to associate the list with
+     * @param campaignId      the ID of the campaign to associate the list with
      * @return the ID of the created list, or null if creation failed
-     * @throws InterruptedException if the list already exists or if an error occurs during creation
+     * @throws InterruptedException if the list already exists or if an error occurs
+     *                              during creation
      */
     public String createList(String listId, String listName, String listDescription, String campaignId) {
 
@@ -799,7 +871,8 @@ public class VicidialClientSingleton {
             }
 
             if (response.contains("SUCCESS")) {
-                System.out.println(Ansi.AUTO.text("@|green ✅ SUCCESS: add_list LIST HAS BEEN ADDED - " + listId + "|@"));
+                System.out
+                        .println(Ansi.AUTO.text("@|green ✅ SUCCESS: add_list LIST HAS BEEN ADDED - " + listId + "|@"));
             }
 
             return listId;
@@ -810,4 +883,79 @@ public class VicidialClientSingleton {
 
     }
 
+    public String createCampaign(String campaignID, String campaignName,
+            String campaignDescripcion, String userGroup, String campaignInboundGroup, String campaignCidGroup)
+            throws IOException, InterruptedException {
+
+        // 1. Configurar el cliente con gestión de cookies
+        CookieManager cookieManager = new CookieManager();
+        HttpClient sessionClient = HttpClient.newBuilder()
+                .cookieHandler(cookieManager)
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
+
+        // 2. Limpieza de ID (Vicidial: Máx 8-20 caracteres, sin espacios)
+        String cleanedCampaignId = campaignID.toUpperCase().trim().replaceAll("\\s+", "");
+        String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
+
+        // PASO 1: Simular entrada al formulario (GET) para obtener PHPSESSID
+        HttpRequest step1 = HttpRequest.newBuilder()
+                .uri(URI.create(serverUrl + "?ADD=11"))
+                .header("Authorization", "Basic " + auth)
+                .header("User-Agent", "Mozilla/5.0")
+                .GET()
+                .build();
+
+        sessionClient.send(step1, HttpResponse.BodyHandlers.ofString());
+
+        // PASO 2: Preparar los datos del POST
+        // IMPORTANTE: No uses URLEncoder aquí, el stream de abajo lo hará por ti.
+        Map<String, String> formData = new LinkedHashMap<>();
+        formData.put("ADD", "21");
+        formData.put("campaign_id", cleanedCampaignId);
+        formData.put("campaign_name", campaignName);
+        formData.put("campaign_description", campaignDescripcion);
+        formData.put("user_group", userGroup);
+        formData.put("active", "Y");
+        formData.put("park_file_name", "default");
+        formData.put("allow_closers", "Y");
+        formData.put("hopper_level", "200");
+        formData.put("auto_dial_level", "1"); // Empezamos bajo por seguridad
+        formData.put("next_agent_call", "oldest_call_finish");
+        formData.put("local_call_time", "24hours");
+        formData.put("script_id", "NONE");
+        formData.put("get_call_launch", "NONE");
+        formData.put("SUBMIT", "SUBMIT");
+
+        // Codificación correcta para evitar el error de doble %
+        String formBody = formData.entrySet().stream()
+                .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" +
+                        URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                .collect(Collectors.joining("&"));
+
+        // PASO 3: Enviar la petición POST
+        HttpRequest step2 = HttpRequest.newBuilder()
+                .uri(URI.create(serverUrl))
+                .header("Authorization", "Basic " + auth)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("Referer", serverUrl + "?ADD=11")
+                .header("User-Agent", "Mozilla/5.0")
+                .POST(HttpRequest.BodyPublishers.ofString(formBody))
+                .build();
+
+        HttpResponse<String> response = sessionClient.send(step2, HttpResponse.BodyHandlers.ofString());
+        String responseBody = response.body();
+
+        // 3. Validación de respuesta (Cambiado a lógica de Campaign)
+        if (responseBody.contains("CAMPAIGN ADDED") || responseBody.contains("has been added")) {
+            System.out.println("✅ Éxito: Campaña '" + cleanedCampaignId + "' creada.");
+            return cleanedCampaignId;
+        } else if (responseBody.contains("ALREADY EXISTS") || responseBody.contains("Campaña ya existe")) {
+            System.err.println("⚠️ La campaña '" + cleanedCampaignId + "' ya existe.");
+            return cleanedCampaignId;
+        } else {
+            System.err.println("❌ Error del servidor al crear campaña.");
+            throw new IOException("El servidor rechazó la creación de la campaña.");
+        }
+    }
 }
