@@ -23,6 +23,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import dev.pablo.models.CampaignBuildInfo;
 import dev.pablo.models.LeadModel;
 import dev.pablo.models.ListModel;
 import dev.pablo.models.UserGroupModel;
@@ -119,14 +120,19 @@ public class VicidialClientSingleton {
      *
      * <p>
      * The instance is lazily initialized with a default HttpClient configured
-     * with a 10 second connection timeout.
+     * with a 10 second connection timeout and a global cookie manager.
      * </p>
      *
      * @return the singleton VicidialClientSingleton instance
      */
     public static VicidialClientSingleton getInstance() {
         if (VicidialClientSingleton.instance == null) {
+            // Se añade el CookieManager global para mantener los PHPSESSID vivos entre
+            // métodos
+            CookieManager globalCookieManager = new CookieManager();
+
             HttpClient client = HttpClient.newBuilder()
+                    .cookieHandler(globalCookieManager)
                     .connectTimeout(Duration.ofSeconds(10))
                     .build();
             VicidialClientSingleton.instance = new VicidialClientSingleton(client);
@@ -595,16 +601,16 @@ public class VicidialClientSingleton {
         }
     }
 
-    public Boolean isValidUserGroup(String groupName) throws IOException, InterruptedException{
-        
-        if(groupName.isBlank()){
+    public Boolean isValidUserGroup(String groupName) throws IOException, InterruptedException {
+
+        if (groupName.isBlank()) {
             return false;
         }
 
         List<UserGroupModel> groups = this.listUserGroups();
 
         for (UserGroupModel userGroupModel : groups) {
-            if( userGroupModel.getId().toLowerCase().equals(groupName.toLowerCase().trim())){
+            if (userGroupModel.getId().toLowerCase().equals(groupName.toLowerCase().trim())) {
                 return true;
             }
         }
@@ -883,24 +889,29 @@ public class VicidialClientSingleton {
 
     }
 
-    public String createCampaign(String campaignID, String campaignName,
-            String campaignDescripcion, String userGroup, String campaignInboundGroup, String campaignCidGroup)
-            throws IOException, InterruptedException {
+    public String copyExistingCampaign(CampaignBuildInfo campaignInfo) throws IOException, InterruptedException {
+        final String FORM_CODE_SIMULATE_FORM = "12"; // add de la pagina del formulario
+        final String FORM_CODE_SIMULATE_ACTION = "20"; // add que apunta el action del formulario
+        final String FORM_CODE_SIMULATE_PERMISSION = "193111111111"; // add que agrega los permisos y permite ver la
+                                                                     // info
+        final String SOURCE_CAMPAIGN_ID = "Test";
 
-        // 1. Configurar el cliente con gestión de cookies
+        Map<String, String> formData = new LinkedHashMap<>();
+
+        String cleanedCampaignId = campaignInfo.getCampaignID().substring(0, 1).toUpperCase()
+                + campaignInfo.getCampaignID().substring(1);
+        ;
+
+        // 1.1 activar simular formulario ADD=12
         CookieManager cookieManager = new CookieManager();
         HttpClient sessionClient = HttpClient.newBuilder()
                 .cookieHandler(cookieManager)
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
 
-        // 2. Limpieza de ID (Vicidial: Máx 8-20 caracteres, sin espacios)
-        String cleanedCampaignId = campaignID.toUpperCase().trim().replaceAll("\\s+", "");
         String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
-
-        // PASO 1: Simular entrada al formulario (GET) para obtener PHPSESSID
         HttpRequest step1 = HttpRequest.newBuilder()
-                .uri(URI.create(serverUrl + "?ADD=11"))
+                .uri(URI.create(serverUrl + "?ADD=" + FORM_CODE_SIMULATE_FORM))
                 .header("Authorization", "Basic " + auth)
                 .header("User-Agent", "Mozilla/5.0")
                 .GET()
@@ -908,37 +919,25 @@ public class VicidialClientSingleton {
 
         sessionClient.send(step1, HttpResponse.BodyHandlers.ofString());
 
-        // PASO 2: Preparar los datos del POST
-        // IMPORTANTE: No uses URLEncoder aquí, el stream de abajo lo hará por ti.
-        Map<String, String> formData = new LinkedHashMap<>();
-        formData.put("ADD", "21");
+        // 1.2 simular copia ADD=20
+        formData.put("ADD", FORM_CODE_SIMULATE_ACTION); // Acción de procesar inserción
+        formData.put("DB", "0"); // Base de datos (requerido por admin.php)
         formData.put("campaign_id", cleanedCampaignId);
-        formData.put("campaign_name", campaignName);
-        formData.put("campaign_description", campaignDescripcion);
-        formData.put("user_group", userGroup);
-        formData.put("active", "Y");
-        formData.put("park_file_name", "default");
-        formData.put("allow_closers", "Y");
-        formData.put("hopper_level", "200");
-        formData.put("auto_dial_level", "1"); // Empezamos bajo por seguridad
-        formData.put("next_agent_call", "oldest_call_finish");
-        formData.put("local_call_time", "24hours");
-        formData.put("script_id", "NONE");
-        formData.put("get_call_launch", "NONE");
-        formData.put("SUBMIT", "SUBMIT");
+        formData.put("campaign_name", campaignInfo.getCampaignName() + "Camp");
+        formData.put("source_campaign_id", SOURCE_CAMPAIGN_ID);
+        formData.put("SUBMIT", "SUBMIT"); // Simulación de clic en botón
 
-        // Codificación correcta para evitar el error de doble %
         String formBody = formData.entrySet().stream()
                 .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" +
                         URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
                 .collect(Collectors.joining("&"));
 
-        // PASO 3: Enviar la petición POST
+        // Enviar la petición POST
         HttpRequest step2 = HttpRequest.newBuilder()
-                .uri(URI.create(serverUrl))
+                .uri(URI.create(serverUrl)) // Se envía a admin.php
                 .header("Authorization", "Basic " + auth)
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("Referer", serverUrl + "?ADD=11")
+                .header("Referer", serverUrl + "?ADD=" + FORM_CODE_SIMULATE_PERMISSION) // Indispensable para Vicidial
                 .header("User-Agent", "Mozilla/5.0")
                 .POST(HttpRequest.BodyPublishers.ofString(formBody))
                 .build();
@@ -946,16 +945,57 @@ public class VicidialClientSingleton {
         HttpResponse<String> response = sessionClient.send(step2, HttpResponse.BodyHandlers.ofString());
         String responseBody = response.body();
 
-        // 3. Validación de respuesta (Cambiado a lógica de Campaign)
-        if (responseBody.contains("CAMPAIGN ADDED") || responseBody.contains("has been added")) {
-            System.out.println("✅ Éxito: Campaña '" + cleanedCampaignId + "' creada.");
-            return cleanedCampaignId;
-        } else if (responseBody.contains("ALREADY EXISTS") || responseBody.contains("Campaña ya existe")) {
-            System.err.println("⚠️ La campaña '" + cleanedCampaignId + "' ya existe.");
-            return cleanedCampaignId;
+        // 4 respuesta
+        if (responseBody.contains("CAMPAIGN NOT ADDED")) {
+            System.err.println(Ansi.AUTO.text("@|red 🔴 ERROR: CAMPAIGN " + cleanedCampaignId + " HAS NOT BEEN ADDED. |@"));
         } else {
-            System.err.println("❌ Error del servidor al crear campaña.");
-            throw new IOException("El servidor rechazó la creación de la campaña.");
+            System.out.println(Ansi.AUTO.text("@|green ✅ SUCCESS: CAMPAIGN " + cleanedCampaignId + " HAS BEEN ADDED. |@"));
+
+            return cleanedCampaignId;
+        }
+
+        return "";
+    }
+
+    /**
+     * Configura el User Group, Inbound Group y parámetros de CID en una campaña
+     * existente
+     * utilizando la Non-Agent API de Vicidial.
+     *
+     * @param campaignId       ID de la campaña a modificar (Ej: "PABLO0")
+     * @param userGroupId      ID del grupo de usuarios (Ej: "pablo")
+     * @param inboundGroupId   ID del grupo entrante (Ej: "pabloinb")
+     * @param cidGroupOrNumber Número CID o ID del grupo de CIDs asignado
+     * @return true si la actualización fue exitosa, false en caso contrario
+     * @throws IOException          Si ocurre un error de red
+     * @throws InterruptedException Si la ejecución es interrumpida
+     */
+    public boolean configureCampaignGroups(String campaignId, String userGroupId, String inboundGroupId, String cidGroupOrNumber)
+            throws IOException, InterruptedException {
+
+        String closerCampaignsFormatted = inboundGroupId.trim();
+
+        // 3. Construir la URL con los parámetros de actualización de la Non-Agent API
+        String urlBuilder = this.buildApiUrl("update_campaign") + 
+                "&active=Y" + 
+                "&campaign_id=" + campaignId +
+                "&campaign_cid=" + cidGroupOrNumber.trim() +
+                "&user_group=" + userGroupId +
+                "&closer_campaigns=" + closerCampaignsFormatted;
+
+        System.out.println(Ansi.AUTO.text("@|blue ⚙️ Aplicando grupos a la campaña " + campaignId + "...|@"));
+
+        // 4. Ejecutar la llamada a la API
+        String response = executeApiCall(urlBuilder.toString());
+
+        // 5. Evaluar la respuesta del backend
+        if (response.contains("SUCCESS")) {
+            System.out.println(Ansi.AUTO
+                    .text("@|green ✅ Éxito: Grupos aplicados correctamente a la campaña " + campaignId + ".|@"));
+            return true;
+        } else {
+            System.err.println(Ansi.AUTO.text("❌ @|red Error de la API al actualizar grupos: |@" + response));
+            return false;
         }
     }
 }
