@@ -127,8 +127,7 @@ public class VicidialClientSingleton {
      */
     public static VicidialClientSingleton getInstance() {
         if (VicidialClientSingleton.instance == null) {
-            // Se añade el CookieManager global para mantener los PHPSESSID vivos entre
-            // métodos
+            // Add a global CookieManager to preserve PHPSESSID between methods
             CookieManager globalCookieManager = new CookieManager();
 
             HttpClient client = HttpClient.newBuilder()
@@ -476,6 +475,14 @@ public class VicidialClientSingleton {
         }
     }
 
+    /**
+     * Update the campaign's active status using the Non-Agent API.
+     *
+     * @param campaignId the campaign identifier
+     * @param active     'Y' to activate or 'N' to deactivate
+     * @throws IOException          if a network or I/O error occurs
+     * @throws InterruptedException if the operation is interrupted
+     */
     public void updateCampaignStatus(String campaignId, String active) throws IOException, InterruptedException {
         // &campaign_id=TESTOUT&active=N
         String url = buildApiUrl("update_campaign") + "&campaign_id=" + campaignId + "&active=" + active;
@@ -495,20 +502,30 @@ public class VicidialClientSingleton {
         }
     }
 
+    /**
+     * Create a new user group via the admin web UI by simulating form submission.
+     *
+     * @param groupName   the desired group identifier (will be lowercased and
+     *                    trimmed)
+     * @param description the human-readable name or description for the group
+     * @return the cleaned group id created on success
+     * @throws IOException          if a network I/O error occurs
+     * @throws InterruptedException if the operation is interrupted or the group
+     *                              exists
+     */
     public String createUserGroup(String groupName, String description) throws IOException, InterruptedException {
-        // 1. Configurar el cliente con gestión de cookies para mantener la sesión
-        // PHPSESSID
+        // 1. Configure the client with cookie management to maintain the PHPSESSID
+        // session
         CookieManager cookieManager = new CookieManager();
         HttpClient sessionClient = HttpClient.newBuilder()
                 .cookieHandler(cookieManager)
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
 
-        // 2. Preparar credenciales y limpiar el ID del grupo
+        // 2. Prepare credentials and sanitize the group ID
         String cleanGroupId = groupName.toLowerCase().trim();
         String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
-        // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el
-        // servidor
+        // STEP 1: Simulate form access (GET) to initialize the session on the server
         HttpRequest step1 = HttpRequest.newBuilder()
                 .uri(URI.create(serverUrl + "?ADD=111111"))
                 .header("Authorization", "Basic " + auth)
@@ -518,25 +535,25 @@ public class VicidialClientSingleton {
 
         sessionClient.send(step1, HttpResponse.BodyHandlers.ofString());
 
-        // PASO 2: Preparar los datos del POST
+        // STEP 2: Prepare the POST data
         Map<String, String> formData = new LinkedHashMap<>();
-        formData.put("ADD", "211111"); // Acción de procesar inserción
-        formData.put("DB", "0"); // Base de datos (requerido por admin.php)
-        formData.put("user_group", cleanGroupId); // ID del grupo
-        formData.put("group_name", description); // Descripción
-        formData.put("SUBMIT", "SUBMIT"); // Simulación de clic en botón
+        formData.put("ADD", "211111"); // action: process insertion
+        formData.put("DB", "0"); // database (required by admin.php)
+        formData.put("user_group", cleanGroupId); // group ID
+        formData.put("group_name", description); // description
+        formData.put("SUBMIT", "SUBMIT"); // simulate submit button
 
         String formBody = formData.entrySet().stream()
                 .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" +
                         URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
                 .collect(Collectors.joining("&"));
 
-        // PASO 3: Enviar la petición POST
+        // STEP 3: Send the POST request
         HttpRequest step2 = HttpRequest.newBuilder()
-                .uri(URI.create(serverUrl)) // Se envía a admin.php
+                .uri(URI.create(serverUrl)) // sent to admin.php
                 .header("Authorization", "Basic " + auth)
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("Referer", serverUrl + "?ADD=111111") // Indispensable para Vicidial
+                .header("Referer", serverUrl + "?ADD=111111") // required by Vicidial
                 .header("User-Agent", "Mozilla/5.0")
                 .POST(HttpRequest.BodyPublishers.ofString(formBody))
                 .build();
@@ -544,14 +561,14 @@ public class VicidialClientSingleton {
         HttpResponse<String> response = sessionClient.send(step2, HttpResponse.BodyHandlers.ofString());
         String responseBody = response.body();
 
-        // 3. Validación de respuesta
+        // 3. Validate response
         if (responseBody.contains("USER GROUP ADDED") || responseBody.contains("has been added")) {
             System.out.println("✅ Success: The group '" + cleanGroupId + "' has been successfully created.");
             return cleanGroupId;
         } else if (responseBody.contains("USER GROUP NOT ADDED")) {
             System.err.println("⚠️ Error: The group '" + cleanGroupId + "' already exists.");
             System.out.println("name: " + groupName);
-            System.out.println("descripcion: " + description);
+            System.out.println("description: " + description);
             throw new InterruptedException("❌ Creation failed. The Group already exists.");
         } else {
             System.err.println("❌ Creation failed. The server rejected the request.");
@@ -559,12 +576,19 @@ public class VicidialClientSingleton {
         }
     }
 
+    /**
+     * Retrieve the list of user groups by parsing the admin HTML page.
+     *
+     * @return a List of UserGroupModel objects or null if no records are found
+     * @throws IOException          if a network I/O error occurs
+     * @throws InterruptedException if the operation is interrupted
+     */
     public List<UserGroupModel> listUserGroups() throws IOException, InterruptedException {
 
         List<UserGroupModel> groups = new ArrayList<>();
         String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
 
-        // URL proporcionada para listar grupos
+        // URL used to list user groups
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(serverUrl + "?ADD=100000"))
                 .header("Authorization", "Basic " + auth)
@@ -575,32 +599,42 @@ public class VicidialClientSingleton {
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         Document doc = Jsoup.parse(response.body());
 
-        // Seleccionamos las filas que contienen los datos de los grupos
+        // Select the rows that contain the group data
         Elements rows = doc.select("tr.records_list_x, tr.records_list_y");
 
         for (Element row : rows) {
             Elements cols = row.select("td");
 
-            // Estructura de tu tabla:
+            // Table structure:
             // 0: USER GROUP (ID) | 1: GROUP NAME | 2: USERS | 3: ACTIVE
             if (cols.size() >= 4) {
                 groups.add(new UserGroupModel(
                         cols.get(0).text().trim(),
                         cols.get(1).text().trim(),
-                        cols.get(3).text().trim() // ACTIVE está en la posición 3 según tu HTML
+                        cols.get(3).text().trim() // ACTIVE is at position 3 according to the HTML
                 ));
             }
         }
 
-        // Mostrar resultados por consola
+        // Display results to console
         if (groups.isEmpty()) {
-            System.out.println("No se encontraron registros en la tabla.");
+            System.out.println("No records found in the table.");
             return null;
         } else {
             return groups;
         }
     }
 
+    /**
+     * Check whether the provided user group exists in the system
+     * (case-insensitive).
+     *
+     * @param groupName the group name to validate
+     * @return true if the group exists, false otherwise
+     * @throws IOException          if a network I/O error occurs while listing
+     *                              groups
+     * @throws InterruptedException if the operation is interrupted
+     */
     public Boolean isValidUserGroup(String groupName) throws IOException, InterruptedException {
 
         if (groupName.isBlank()) {
@@ -618,22 +652,31 @@ public class VicidialClientSingleton {
         return false;
     }
 
+    /**
+     * Create a CID group by submitting the admin form via HTTP session simulation.
+     *
+     * @param CidName        the desired CID group name
+     * @param cidDescription description or notes for the CID group
+     * @return the cleaned CID group id on success
+     * @throws IOException          if a network I/O error occurs
+     * @throws InterruptedException if the operation is interrupted or the CID
+     *                              exists
+     */
     public String createCIDGroup(String CidName, String cidDescription) throws IOException, InterruptedException {
 
-        // 1. Configurar el cliente con gestión de cookies para mantener la sesión
-        // PHPSESSID
+        // 1. Configure the client with cookie management to maintain the PHPSESSID
+        // session
         CookieManager cookieManager = new CookieManager();
         HttpClient sessionClient = HttpClient.newBuilder()
                 .cookieHandler(cookieManager)
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
 
-        // 2. Preparar credenciales y limpiar el ID del grupo
+        // 2. Prepare credentials and sanitize the group ID
         String cleanGroupId = CidName.toLowerCase().trim().replaceAll(" ", "%20") + "CID";
         String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
 
-        // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el
-        // servidor
+        // STEP 1: Simulate form access (GET) to initialize the session on the server
         HttpRequest step1 = HttpRequest.newBuilder()
                 .uri(URI.create(serverUrl + "?ADD=196111111111"))
                 .header("Authorization", "Basic " + auth)
@@ -643,27 +686,27 @@ public class VicidialClientSingleton {
 
         sessionClient.send(step1, HttpResponse.BodyHandlers.ofString());
 
-        // PASO 2: Preparar los datos del POST
+        // STEP 2: Prepare the POST data
         Map<String, String> formData = new LinkedHashMap<>();
-        formData.put("ADD", "296111111111"); // Acción de procesar inserción
-        formData.put("DB", "0"); // Base de datos (requerido por admin.php)
-        formData.put("cid_group_id", cleanGroupId); // ID del grupo
-        formData.put("cid_group_notes", cidDescription); // Descripción
+        formData.put("ADD", "296111111111"); // action: process insertion
+        formData.put("DB", "0"); // database (required by admin.php)
+        formData.put("cid_group_id", cleanGroupId); // group ID
+        formData.put("cid_group_notes", cidDescription); // description
         formData.put("cid_group_type", "NONE");
         formData.put("user_group", "---ALL---");
-        formData.put("SUBMIT", "SUBMIT"); // Simulación de clic en botón
+        formData.put("SUBMIT", "SUBMIT"); // simulate submit button
 
         String formBody = formData.entrySet().stream()
                 .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" +
                         URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
                 .collect(Collectors.joining("&"));
 
-        // PASO 3: Enviar la petición POST
+        // STEP 3: Send the POST request
         HttpRequest step2 = HttpRequest.newBuilder()
-                .uri(URI.create(serverUrl)) // Se envía a admin.php
+                .uri(URI.create(serverUrl)) // sent to admin.php
                 .header("Authorization", "Basic " + auth)
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("Referer", serverUrl + "?ADD=196111111111") // Indispensable para Vicidial
+                .header("Referer", serverUrl + "?ADD=196111111111") // required by Vicidial
                 .header("User-Agent", "Mozilla/5.0")
                 .POST(HttpRequest.BodyPublishers.ofString(formBody))
                 .build();
@@ -671,10 +714,10 @@ public class VicidialClientSingleton {
         HttpResponse<String> response = sessionClient.send(step2, HttpResponse.BodyHandlers.ofString());
         String responseBody = response.body();
 
-        System.out.println("name: " + cleanGroupId);
-        System.out.println("name: " + CidName);
+        System.out.println("cleanGroupId: " + cleanGroupId);
+        System.out.println("cidName: " + CidName);
         System.out.println(response.statusCode());
-        // 3. Validación de respuesta
+        // 3. Validate response
         if (responseBody.contains("CID GROUP ADDED") || responseBody.contains("has been added")) {
             System.out.println("✅ Success: The CID group '" + cleanGroupId + "' has been successfully created.");
             return cleanGroupId;
@@ -688,26 +731,37 @@ public class VicidialClientSingleton {
 
     }
 
+    /**
+     * Create an inbound group by simulating the admin form submission.
+     *
+     * @param inboundName        the inbound group name to create
+     * @param inboundDescription the display description for the inbound group
+     * @param groupID            the user group id to associate ("---ALL---" for
+     *                           all)
+     * @return the cleaned inbound group id on success
+     * @throws IOException          if a network I/O error occurs
+     * @throws InterruptedException if the operation is interrupted or the group
+     *                              exists
+     */
     public String createInboundGroup(String inboundName, String inboundDescription, String groupID)
             throws IOException, InterruptedException {
         if (groupID.isEmpty()) {
             groupID = "---ALL---";
         }
 
-        // 1. Configurar el cliente con gestión de cookies para mantener la sesión
-        // PHPSESSID
+        // 1. Configure the client with cookie management to maintain the PHPSESSID
+        // session
         CookieManager cookieManager = new CookieManager();
         HttpClient sessionClient = HttpClient.newBuilder()
                 .cookieHandler(cookieManager)
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
 
-        // 2. Preparar credenciales y limpiar el ID del grupo
+        // 2. Prepare credentials and sanitize the inbound group ID
         String cleanGroupId = inboundName.toLowerCase().trim().replaceAll(" ", "%20") + "Inb";
         String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
 
-        // PASO 1: Simular entrada al formulario (GET) para activar la sesión en el
-        // servidor
+        // STEP 1: Simulate form access (GET) to initialize the session on the server
         HttpRequest step1 = HttpRequest.newBuilder()
                 .uri(URI.create(serverUrl + "?ADD=1111"))
                 .header("Authorization", "Basic " + auth)
@@ -717,9 +771,9 @@ public class VicidialClientSingleton {
 
         sessionClient.send(step1, HttpResponse.BodyHandlers.ofString());
 
-        // PASO 2: Preparar los datos del POST
+        // STEP 2: Prepare the POST data
         Map<String, String> formData = new LinkedHashMap<>();
-        formData.put("ADD", "2111"); // Acción de procesar inserción
+        formData.put("ADD", "2111"); // action: process insertion
         formData.put("DB", "0"); // Base de datos (requerido por admin.php)
         formData.put("group_id", cleanGroupId);
         formData.put("group_name", inboundDescription);
@@ -740,12 +794,12 @@ public class VicidialClientSingleton {
                         URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
                 .collect(Collectors.joining("&"));
 
-        // PASO 3: Enviar la petición POST
+        // STEP 3: Send the POST request
         HttpRequest step2 = HttpRequest.newBuilder()
-                .uri(URI.create(serverUrl)) // Se envía a admin.php
+                .uri(URI.create(serverUrl)) // sent to admin.php
                 .header("Authorization", "Basic " + auth)
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("Referer", serverUrl + "?ADD=196111111111") // Indispensable para Vicidial
+                .header("Referer", serverUrl + "?ADD=196111111111") // required by Vicidial
                 .header("User-Agent", "Mozilla/5.0")
                 .POST(HttpRequest.BodyPublishers.ofString(formBody))
                 .build();
@@ -754,12 +808,12 @@ public class VicidialClientSingleton {
         String responseBody = response.body();
 
         System.out.println(response.statusCode());
-        // 3. Validación de respuesta
+        // 3. Validate response
         if (responseBody.contains("GROUP ADDED") || responseBody.contains("has been added")) {
-            System.out.println("✅ Success: The CID group '" + cleanGroupId + "' has been successfully created.");
+            System.out.println("✅ Success: The inbound group '" + cleanGroupId + "' has been successfully created.");
             return cleanGroupId;
         } else if (responseBody.contains("GROUP NOT ADDED")) {
-            System.err.println("⚠️ Error: The CID group '" + cleanGroupId + "Inb' already exists.");
+            System.err.println("⚠️ Error: The inbound group '" + cleanGroupId + "' already exists.");
             throw new InterruptedException("❌ Creation failed. The inbound group already exists.");
         } else {
             System.err.println("❌ Creation failed. The server rejected the request.");
@@ -789,14 +843,14 @@ public class VicidialClientSingleton {
         List<ListModel> lists = new ArrayList<>();
         Document doc = Jsoup.parse(response);
 
-        // Seleccionamos las filas que tienen las clases de la lista de registros
+        // Select the rows that have the record list classes
         Elements rows = doc.select("tr.records_list_x, tr.records_list_y");
 
         for (Element row : rows) {
             Elements cols = row.select("td");
 
             if (cols.size() >= 9) {
-                // Extraemos el texto limpiando espacios en blanco sobrantes
+                // Extract the text, trimming extra whitespace
                 String id = cols.get(0).text().trim();
                 String name = cols.get(1).text().trim();
                 String description = cols.get(2).text().trim();
@@ -889,11 +943,22 @@ public class VicidialClientSingleton {
 
     }
 
+    /**
+     * Copy an existing campaign by simulating the admin copy form and submitting
+     * it.
+     *
+     * @param campaignInfo information required to build the new campaign (id and
+     *                     name)
+     * @return the cleaned campaign id if created successfully, otherwise empty
+     *         string
+     * @throws IOException          if a network I/O error occurs
+     * @throws InterruptedException if the operation is interrupted
+     */
     public String copyExistingCampaign(CampaignBuildInfo campaignInfo) throws IOException, InterruptedException {
-        final String FORM_CODE_SIMULATE_FORM = "12"; // add de la pagina del formulario
-        final String FORM_CODE_SIMULATE_ACTION = "20"; // add que apunta el action del formulario
-        final String FORM_CODE_SIMULATE_PERMISSION = "193111111111"; // add que agrega los permisos y permite ver la
-                                                                     // info
+        final String FORM_CODE_SIMULATE_FORM = "12"; // form page ADD code (simulate opening the form)
+        final String FORM_CODE_SIMULATE_ACTION = "20"; // action ADD code (form action for copying campaign)
+        final String FORM_CODE_SIMULATE_PERMISSION = "193111111111"; // permission ADD code (adds permissions to view
+                                                                     // info)
         final String SOURCE_CAMPAIGN_ID = "Test";
 
         Map<String, String> formData = new LinkedHashMap<>();
@@ -902,7 +967,7 @@ public class VicidialClientSingleton {
                 + campaignInfo.getCampaignID().substring(1);
         ;
 
-        // 1.1 activar simular formulario ADD=12
+        // 1.1 Activate simulate form ADD=12
         CookieManager cookieManager = new CookieManager();
         HttpClient sessionClient = HttpClient.newBuilder()
                 .cookieHandler(cookieManager)
@@ -919,9 +984,9 @@ public class VicidialClientSingleton {
 
         sessionClient.send(step1, HttpResponse.BodyHandlers.ofString());
 
-        // 1.2 simular copia ADD=20
-        formData.put("ADD", FORM_CODE_SIMULATE_ACTION); // Acción de procesar inserción
-        formData.put("DB", "0"); // Base de datos (requerido por admin.php)
+        // 1.2 Simulate copy using ADD=20
+        formData.put("ADD", FORM_CODE_SIMULATE_ACTION); // action: process insertion
+        formData.put("DB", "0"); // database (required by admin.php)
         formData.put("campaign_id", cleanedCampaignId);
         formData.put("campaign_name", campaignInfo.getCampaignName() + "Camp");
         formData.put("source_campaign_id", SOURCE_CAMPAIGN_ID);
@@ -932,12 +997,12 @@ public class VicidialClientSingleton {
                         URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
                 .collect(Collectors.joining("&"));
 
-        // Enviar la petición POST
+        // Send the POST request
         HttpRequest step2 = HttpRequest.newBuilder()
-                .uri(URI.create(serverUrl)) // Se envía a admin.php
+                .uri(URI.create(serverUrl)) // sent to admin.php
                 .header("Authorization", "Basic " + auth)
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("Referer", serverUrl + "?ADD=" + FORM_CODE_SIMULATE_PERMISSION) // Indispensable para Vicidial
+                .header("Referer", serverUrl + "?ADD=" + FORM_CODE_SIMULATE_PERMISSION) // required by Vicidial
                 .header("User-Agent", "Mozilla/5.0")
                 .POST(HttpRequest.BodyPublishers.ofString(formBody))
                 .build();
@@ -945,11 +1010,13 @@ public class VicidialClientSingleton {
         HttpResponse<String> response = sessionClient.send(step2, HttpResponse.BodyHandlers.ofString());
         String responseBody = response.body();
 
-        // 4 respuesta
+        // 4. Response handling
         if (responseBody.contains("CAMPAIGN NOT ADDED")) {
-            System.err.println(Ansi.AUTO.text("@|red 🔴 ERROR: CAMPAIGN " + cleanedCampaignId + " HAS NOT BEEN ADDED. |@"));
+            System.err.println(
+                    Ansi.AUTO.text("@|red 🔴 ERROR: CAMPAIGN " + cleanedCampaignId + " HAS NOT BEEN ADDED. |@"));
         } else {
-            System.out.println(Ansi.AUTO.text("@|green ✅ SUCCESS: CAMPAIGN " + cleanedCampaignId + " HAS BEEN ADDED. |@"));
+            System.out.println(
+                    Ansi.AUTO.text("@|green ✅ SUCCESS: CAMPAIGN " + cleanedCampaignId + " HAS BEEN ADDED. |@"));
 
             return cleanedCampaignId;
         }
@@ -958,32 +1025,33 @@ public class VicidialClientSingleton {
     }
 
     /**
-     * Configura el User Group, Inbound Group y parámetros de CID en una campaña
-     * existente
-     * utilizando la Non-Agent API de Vicidial.
+     * Apply user group, inbound group and CID parameters to an existing campaign
+     * using the Vicidial Non-Agent API.
      *
-     * @param campaignId       ID de la campaña a modificar (Ej: "PABLO0")
-     * @param userGroupId      ID del grupo de usuarios (Ej: "pablo")
-     * @param inboundGroupId   ID del grupo entrante (Ej: "pabloinb")
-     * @param cidGroupOrNumber Número CID o ID del grupo de CIDs asignado
-     * @return true si la actualización fue exitosa, false en caso contrario
-     * @throws IOException          Si ocurre un error de red
-     * @throws InterruptedException Si la ejecución es interrumpida
+     * @param campaignId       The campaign ID to modify (e.g. "PABLO0").
+     * @param userGroupId      The user group ID to assign (e.g. "pablo").
+     * @param inboundGroupId   The inbound group ID to assign (e.g. "pabloinb").
+     * @param cidGroupOrNumber The CID number or CID group ID to set for the
+     *                         campaign.
+     * @return true if the update succeeded, false otherwise.
+     * @throws IOException          If a network error occurs.
+     * @throws InterruptedException If the execution is interrupted.
      */
-    public boolean configureCampaignGroups(String campaignId, String userGroupId, String inboundGroupId, String cidGroupOrNumber)
+    public boolean configureCampaignGroups(String campaignId, String userGroupId, String inboundGroupId,
+            String cidGroupOrNumber)
             throws IOException, InterruptedException {
 
         String closerCampaignsFormatted = inboundGroupId.trim();
 
         // 3. Construir la URL con los parámetros de actualización de la Non-Agent API
-        String urlBuilder = this.buildApiUrl("update_campaign") + 
-                "&active=Y" + 
+        String urlBuilder = this.buildApiUrl("update_campaign") +
+                "&active=Y" +
                 "&campaign_id=" + campaignId +
                 "&campaign_cid=" + cidGroupOrNumber.trim() +
                 "&user_group=" + userGroupId +
                 "&closer_campaigns=" + closerCampaignsFormatted;
 
-        System.out.println(Ansi.AUTO.text("@|blue ⚙️ Aplicando grupos a la campaña " + campaignId + "...|@"));
+        System.out.println(Ansi.AUTO.text("@|blue ⚙️ Applying groups to campaign " + campaignId + "...|@"));
 
         // 4. Ejecutar la llamada a la API
         String response = executeApiCall(urlBuilder.toString());
@@ -991,10 +1059,10 @@ public class VicidialClientSingleton {
         // 5. Evaluar la respuesta del backend
         if (response.contains("SUCCESS")) {
             System.out.println(Ansi.AUTO
-                    .text("@|green ✅ Éxito: Grupos aplicados correctamente a la campaña " + campaignId + ".|@"));
+                    .text("@|green ✅ Success: Groups successfully applied to campaign " + campaignId + ".|@"));
             return true;
         } else {
-            System.err.println(Ansi.AUTO.text("❌ @|red Error de la API al actualizar grupos: |@" + response));
+            System.err.println(Ansi.AUTO.text("❌ @|red API error updating groups: |@" + response));
             return false;
         }
     }
