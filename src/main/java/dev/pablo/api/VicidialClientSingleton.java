@@ -94,20 +94,23 @@ public class VicidialClientSingleton {
         String envBase = dotenv.get("BASE_URL");
         String envUser = dotenv.get("API_USER");
         String envPass = dotenv.get("API_PASSWORD");
-        String serverIp = dotenv.get("SERVER_IP");
-        String templateId = dotenv.get("TEMPLATE_ID");
+        String envServerIp = dotenv.get("SERVER_IP");
+        String envTemplateId = dotenv.get("TEMPLATE_ID");
+        String envServerUrl = dotenv.get("SERVER_URL");
 
         String sysBase = System.getenv("BASE_URL");
         String sysUser = System.getenv("API_USER");
         String sysPass = System.getenv("API_PASSWORD");
-        String serverUrl = System.getenv("SERVER_URL");
+        String sysServerIp = System.getenv("SERVER_IP");
+        String sysTemplateId = System.getenv("TEMPLATE_ID");
+        String sysServerUrl = System.getenv("SERVER_URL");
 
         this.baseUrl = (envBase != null && !envBase.isBlank()) ? envBase : sysBase;
         this.apiUser = (envUser != null && !envUser.isBlank()) ? envUser : sysUser;
         this.apiPass = (envPass != null && !envPass.isBlank()) ? envPass : sysPass;
-        this.serverIp = (serverIp != null && !serverIp.isBlank()) ? serverIp : serverIp;
-        this.templateId = (templateId != null && !templateId.isBlank()) ? templateId : templateId;
-        this.serverUrl = (serverUrl != null && !serverUrl.isBlank()) ? serverUrl : serverUrl;
+        this.serverIp = (envServerIp != null && !envServerIp.isBlank()) ? envServerIp : sysServerIp;
+        this.templateId = (envTemplateId != null && !envTemplateId.isBlank()) ? envTemplateId : sysTemplateId;
+        this.serverUrl = (envServerUrl != null && !envServerUrl.isBlank()) ? envServerUrl : sysServerUrl;
 
         if (this.baseUrl == null || this.apiUser == null || this.apiPass == null) {
             throw new IllegalStateException(
@@ -391,6 +394,13 @@ public class VicidialClientSingleton {
      * @throws InterruptedException When the thread is interrupted while waiting.
      */
     public void createPhone(String ID, String password) throws IOException, InterruptedException {
+        if (this.serverIp == null || this.serverIp.isBlank()) {
+            throw new IOException("Missing configuration: define SERVER_IP in .env or as an environment variable.");
+        }
+        if (this.templateId == null || this.templateId.isBlank()) {
+            throw new IOException("Missing configuration: define TEMPLATE_ID in .env or as an environment variable.");
+        }
+
         String cid = "0000000000";
         String phoneURL = buildApiUrl("add_phone") +
                 "&extension=" + ID +
@@ -714,9 +724,6 @@ public class VicidialClientSingleton {
         HttpResponse<String> response = sessionClient.send(step2, HttpResponse.BodyHandlers.ofString());
         String responseBody = response.body();
 
-        System.out.println("cleanGroupId: " + cleanGroupId);
-        System.out.println("cidName: " + CidName);
-        System.out.println(response.statusCode());
         // 3. Validate response
         if (responseBody.contains("CID GROUP ADDED") || responseBody.contains("has been added")) {
             System.out.println("✅ Success: The CID group '" + cleanGroupId + "' has been successfully created.");
@@ -807,7 +814,6 @@ public class VicidialClientSingleton {
         HttpResponse<String> response = sessionClient.send(step2, HttpResponse.BodyHandlers.ofString());
         String responseBody = response.body();
 
-        System.out.println(response.statusCode());
         // 3. Validate response
         if (responseBody.contains("GROUP ADDED") || responseBody.contains("has been added")) {
             System.out.println("✅ Success: The inbound group '" + cleanGroupId + "' has been successfully created.");
@@ -1057,6 +1063,8 @@ public class VicidialClientSingleton {
         String response = executeApiCall(urlBuilder.toString());
 
         // 5. Evaluar la respuesta del backend
+        System.out.println("   API response: " + response.trim());
+
         if (response.contains("SUCCESS")) {
             System.out.println(Ansi.AUTO
                     .text("@|green ✅ Success: Groups successfully applied to campaign " + campaignId + ".|@"));
@@ -1065,5 +1073,17 @@ public class VicidialClientSingleton {
             System.err.println(Ansi.AUTO.text("❌ @|red API error updating groups: |@" + response));
             return false;
         }
+    }
+
+    /**
+     * Reads back the stored settings of a campaign through the Non-Agent API.
+     *
+     * @param campaignId the campaign identifier to inspect
+     * @return the raw API response body
+     * @throws IOException          If a network error occurs.
+     * @throws InterruptedException If the execution is interrupted.
+     */
+    public String showCampaign(String campaignId) throws IOException, InterruptedException {
+        return executeApiCall(this.buildApiUrl("show_campaign") + "&campaign_id=" + campaignId);
     }
 }
