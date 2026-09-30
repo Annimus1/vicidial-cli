@@ -71,7 +71,7 @@ variable at once. Requirements per command:
 | `campaign CREATE` | the three above + SERVER_URL, plus SERVER_IP and TEMPLATE_ID when `-n` is used |
 | `createCreds` | BASE_URL, API_USER, API_PASSWORD, SERVER_IP, TEMPLATE_ID |
 | `updateCred` | BASE_URL, API_USER, API_PASSWORD, plus SERVER_IP when a password is given |
-| `deleteDIDs` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
+| `did list`, `did verify`, `did remove` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
 | `leadDetails`, `duplicateInList` | BASE_URL, API_USER, API_PASSWORD |
 
 Examples
@@ -125,15 +125,21 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
   - Usage: `vicidial-cli updateCred <ID> [-n|--name "<displayName>"] [-p|--password <newPassword>]`
   - Example: `vicidial-cli updateCred agent001 -n "John Doe" -p N3wP@ss`
 
-- ### deleteDIDs — delete DIDs from Vicidial admin page.
-  - Modes:
-    - SINGLE: remove a single DID by exact number (`--did`)
-    - MULTIPLE: remove DIDs listed in a newline-separated file (`-l` / `--list`)
-    - GROUP: planned — remove by usergroup (not fully implemented)
+- ### did — work with the DIDs stored on the instance.
+  - Subcommands:
+    - `did list` — show the DIDs on the instance, with `--active`, `--inactive`, `--group`, `--carrier` filters, or DID numbers as positional arguments
+    - `did verify <number>` — check that a DID exists and show its group, route, carrier and description; exits `1` when it is not on the instance
+    - `did remove` — remove DIDs, selected with exactly one of `--did`, `--file` or `--group`; supports `--dry-run` and `--force`
+    - `did add` — not implemented yet
+  - Subcommand names are case-insensitive, so `did LIST` also works.
   - DID format validation: must start with `1` and be 11 digits (e.g. `15551234567`).
+  - A bulk removal asks for confirmation; `--force` skips it, `--dry-run` previews without changing anything.
   - Examples:
-    - Single DID: `vicidial-cli deleteDIDs -m SINGLE --did 15551234567`
-    - Multiple (file): `vicidial-cli deleteDIDs -m MULTIPLE -l /path/to/dids.txt`
+    - `vicidial-cli did list`
+    - `vicidial-cli did verify 15551234567`
+    - `vicidial-cli did remove --did 15551234567`
+    - `vicidial-cli did remove --file /path/to/dids.txt`
+    - `vicidial-cli did remove --group SALES_TEAM --dry-run`
 
 ## Examples
 
