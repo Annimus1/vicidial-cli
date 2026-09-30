@@ -77,6 +77,8 @@ public class CreatCredentialCommand implements Callable<Integer> {
     @Override
     public Integer call() {
         try {
+            client.requirePhoneConfig();
+
             // Create User
             System.out.println(Ansi.AUTO.text("⏳ @|yellow Creating Credentials ...|@ "));
             if(this.name.isEmpty()){
@@ -97,6 +99,9 @@ public class CreatCredentialCommand implements Callable<Integer> {
             return 1;
         } catch (InterruptedException e) {
             System.out.println(Ansi.AUTO.text("❌ @|red The request was interrupted.|@"));
+            return 1;
+        } catch (IllegalStateException e) {
+            System.err.println(Ansi.AUTO.text("❌ @|red " + e.getMessage() + " |@"));
             return 1;
         }
     }

@@ -52,7 +52,10 @@ import picocli.CommandLine.Option;
     " "
 }, mixinStandardHelpOptions = true)
 public class DIDsCommand implements Callable<Integer> {
-  private final String DIDS_URL = "https://cloud.yourserviceva.net/vicidial/admin.php?ADD=1300";
+  /**
+   * Vicidial ADD code for the admin page that lists the DIDs.
+   */
+  private static final String DIDS_ADD_CODE = "1300";
 
   /**
    * Modes supported by the command.
@@ -123,7 +126,7 @@ public class DIDsCommand implements Callable<Integer> {
   @Override
   public Integer call() {
     try {
-      String html = client.getFromWeb(DIDS_URL);
+      String html = client.getFromWeb(client.adminPageUrl(DIDS_ADD_CODE));
       dids = HtmlParser.ParseDIDs(html);
       System.out.println(Ansi.AUTO.text("@|blue Total of #️⃣ " + dids.size() + " DIDs Found.|@"));
 
@@ -158,6 +161,9 @@ public class DIDsCommand implements Callable<Integer> {
       return 1;
     } catch (InterruptedException e) {
       System.out.println(Ansi.AUTO.text("❌ @|red The request was interrupted.|@"));
+      return 1;
+    } catch (IllegalStateException e) {
+      System.err.println(Ansi.AUTO.text("❌ @|red " + e.getMessage() + " |@"));
       return 1;
     }
     return 0;

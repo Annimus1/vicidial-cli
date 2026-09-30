@@ -58,9 +58,21 @@ vicidial-cli reads configuration from a .env file at the repository root or from
 - BASE_URL — (required) Base API endpoint, e.g. https://your-vicidial-server.com/agc/api.php
 - API_USER — (required) API username (or an admin user for admin-page requests)
 - API_PASSWORD — (required) API password
-- SERVER_IP — (optional) SIP server IP used for phone operations
-- TEMPLATE_ID — (optional) Phone template id (used when creating phones)
-- SERVER_URL — (optional) Secondary web UI URL used for DID operations (admin pages)
+- SERVER_IP — (required to create or update phones) SIP server IP used for phone operations
+- TEMPLATE_ID — (required to create phones) Phone template id
+- SERVER_URL — (required for admin pages) Web UI URL of the Vicidial admin, e.g. https://your-vicidial-server/vicidial/admin.php
+
+The CLI validates configuration before doing any work and reports every missing
+variable at once. Requirements per command:
+
+| Command | Required variables |
+|---------|--------------------|
+| `campaign INFO`, `campaign PAUSE`, `campaign ACTIVE` | BASE_URL, API_USER, API_PASSWORD |
+| `campaign CREATE` | the three above + SERVER_URL, plus SERVER_IP and TEMPLATE_ID when `-n` is used |
+| `createCreds` | BASE_URL, API_USER, API_PASSWORD, SERVER_IP, TEMPLATE_ID |
+| `updateCred` | BASE_URL, API_USER, API_PASSWORD, plus SERVER_IP when a password is given |
+| `deleteDIDs` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
+| `leadDetails`, `duplicateInList` | BASE_URL, API_USER, API_PASSWORD |
 
 Examples
 
@@ -71,7 +83,7 @@ API_USER=admin
 API_PASSWORD=secret
 SERVER_IP=10.0.0.1
 TEMPLATE_ID=123
-SERVER_URL=https://your-vicidial-server/web
+SERVER_URL=https://your-vicidial-server/vicidial/admin.php
 ```
 
 - Export environment variables in a shell session:
@@ -79,9 +91,9 @@ SERVER_URL=https://your-vicidial-server/web
 export BASE_URL="https://vicidial.example/api"
 export API_USER="api_user"
 export API_PASSWORD="supersecret"
-export SERVER_IP="192.0.2.10"  
-export TEMPLATE_ID="123"       
-export SERVER_URL="https://..."
+export SERVER_IP="192.0.2.10"
+export TEMPLATE_ID="123"
+export SERVER_URL="https://vicidial.example/vicidial/admin.php"
 ```
 
 When running the packaged JAR, ensure the environment variables are available to the process (persist via shell profile or export inline):

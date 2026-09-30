@@ -101,7 +101,16 @@ public class UpdateCredCommand implements Callable<Integer> {
             System.err.println(Ansi.AUTO.text("❌ @|red In order to update credentials you must provide either name, password or both.|@"));
             return 1;
         }
-        
+
+        if(!password.isEmpty()){
+            try {
+                client.requireConfig(VicidialClientSingleton.VAR_SERVER_IP);
+            } catch (IllegalStateException e) {
+                System.err.println(Ansi.AUTO.text("❌ @|red " + e.getMessage() + " |@"));
+                return 1;
+            }
+        }
+
         try{
             System.out.println(Ansi.AUTO.text("@|blue Updating User ...|@"));
             client.updateUser(ID, name, password);
