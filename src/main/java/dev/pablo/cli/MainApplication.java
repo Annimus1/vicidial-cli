@@ -11,9 +11,9 @@ import dev.pablo.api.LeadDetailCommand;
 import dev.pablo.api.DuplicateLeadCommand;
 import dev.pablo.api.UpdateCredCommand;
 import dev.pablo.api.CreatCredentialCommand;
-import dev.pablo.api.DeleteDIDCommand;
+import dev.pablo.api.DIDsCommand;
 
-@Command(name = "vicidial-cli", mixinStandardHelpOptions = true, // Enables --help, -h, --version
+@Command(name = "vicidial-cli", mixinStandardHelpOptions = true,
     version = "Vicidial CLI 1.0", description = "Command-line tool for the Vicidial API.")
 public class MainApplication implements Callable<Integer> {
     @CommandLine.Spec
@@ -23,12 +23,12 @@ public class MainApplication implements Callable<Integer> {
         // Use Picocli as the command engine instead of custom API handling
 
         int exitCode = new CommandLine(new MainApplication())
-                .addSubcommand("createCreds", CreatCredentialCommand.class)
-                .addSubcommand("duplicateInList", DuplicateLeadCommand.class)
-                .addSubcommand("getAllCampaigns", CampaignsCommand.class)
+                .addSubcommand("campaign", CampaignsCommand.class)
                 .addSubcommand("leadDetails", LeadDetailCommand.class)
+                .addSubcommand("duplicateInList", DuplicateLeadCommand.class)
+                .addSubcommand("createCreds", CreatCredentialCommand.class)
                 .addSubcommand("updateCred", UpdateCredCommand.class)
-                .addSubcommand("deleteDIDs", DeleteDIDCommand.class)
+                .addSubcommand("deleteDIDs", DIDsCommand.class)
 
                 .execute(args);
 

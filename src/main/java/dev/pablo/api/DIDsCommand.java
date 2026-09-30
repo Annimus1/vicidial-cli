@@ -51,7 +51,7 @@ import picocli.CommandLine.Option;
     "  vicidial-cli deleteDIDs -m GROUP --group SALES_TEAM",
     " "
 }, mixinStandardHelpOptions = true)
-public class DeleteDIDCommand implements Callable<Integer> {
+public class DIDsCommand implements Callable<Integer> {
   private final String DIDS_URL = "https://cloud.yourserviceva.net/vicidial/admin.php?ADD=1300";
 
   /**
@@ -106,7 +106,7 @@ public class DeleteDIDCommand implements Callable<Integer> {
 
   private final VicidialClientSingleton client;
 
-  public DeleteDIDCommand() {
+  public DIDsCommand() {
     this.client = VicidialClientSingleton.getInstance();
   }
 
