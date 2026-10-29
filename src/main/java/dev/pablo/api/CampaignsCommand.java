@@ -88,7 +88,14 @@ public class CampaignsCommand implements Callable<Integer> {
                     System.err.println(Ansi.AUTO.text("❌ @|red A password is required to create " + this.userCount + " user(s). |@"));
                     return 1;
                 }
-                
+
+                // Configuration required by the creation chain, checked before any
+                // object is created so a missing variable cannot leave a partial
+                // campaign behind.
+                else if (!checkCreateConfig()) {
+                    return 1;
+                }
+
                 // Create Camp
                 else {
                     return createCampaign() ? 0 : 1;
@@ -271,6 +278,32 @@ public class CampaignsCommand implements Callable<Integer> {
             System.err.println("  created before the failure: " + (created.isEmpty() ? "nothing" : created));
             System.err.println("  elapsed: " + (System.currentTimeMillis() - campaignStartedAt) + " ms");
             System.err.println(STEP_SEPARATOR);
+            return false;
+        }
+    }
+
+    /**
+     * Verifies that the configuration needed by the CREATE chain is present.
+     *
+     * <p>
+     * The user group, CID group, inbound group and list steps go through the admin
+     * web pages, so SERVER_URL is always required. Phones are only created when
+     * users were requested, which additionally requires SERVER_IP and TEMPLATE_ID.
+     * </p>
+     *
+     * @return true when every required variable is configured
+     */
+    private boolean checkCreateConfig() {
+        try {
+            client.requireConfig(VicidialClientSingleton.VAR_SERVER_URL);
+
+            if (this.userCount > 0) {
+                client.requirePhoneConfig();
+            }
+
+            return true;
+        } catch (IllegalStateException e) {
+            System.err.println(Ansi.AUTO.text("❌ @|red " + e.getMessage() + " |@"));
             return false;
         }
     }

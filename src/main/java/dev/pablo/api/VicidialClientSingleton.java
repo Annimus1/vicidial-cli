@@ -57,6 +57,13 @@ import picocli.CommandLine.Help.Ansi;
  */
 public class VicidialClientSingleton {
 
+    public static final String VAR_BASE_URL = "BASE_URL";
+    public static final String VAR_API_USER = "API_USER";
+    public static final String VAR_API_PASSWORD = "API_PASSWORD";
+    public static final String VAR_SERVER_IP = "SERVER_IP";
+    public static final String VAR_TEMPLATE_ID = "TEMPLATE_ID";
+    public static final String VAR_SERVER_URL = "SERVER_URL";
+
     public static VicidialClientSingleton instance = null;
     private HttpClient client;
     private final String baseUrl;
@@ -67,6 +74,7 @@ public class VicidialClientSingleton {
     private final String serverIp;
     private final String templateId;
     private final String serverUrl;
+    private final Map<String, String> config;
 
     /**
      * Creates a new wrapper instance using the provided HttpClient.
@@ -91,31 +99,81 @@ public class VicidialClientSingleton {
                 .ignoreIfMissing()
                 .load();
 
-        String envBase = dotenv.get("BASE_URL");
-        String envUser = dotenv.get("API_USER");
-        String envPass = dotenv.get("API_PASSWORD");
-        String envServerIp = dotenv.get("SERVER_IP");
-        String envTemplateId = dotenv.get("TEMPLATE_ID");
-        String envServerUrl = dotenv.get("SERVER_URL");
-
-        String sysBase = System.getenv("BASE_URL");
-        String sysUser = System.getenv("API_USER");
-        String sysPass = System.getenv("API_PASSWORD");
-        String sysServerIp = System.getenv("SERVER_IP");
-        String sysTemplateId = System.getenv("TEMPLATE_ID");
-        String sysServerUrl = System.getenv("SERVER_URL");
-
-        this.baseUrl = (envBase != null && !envBase.isBlank()) ? envBase : sysBase;
-        this.apiUser = (envUser != null && !envUser.isBlank()) ? envUser : sysUser;
-        this.apiPass = (envPass != null && !envPass.isBlank()) ? envPass : sysPass;
-        this.serverIp = (envServerIp != null && !envServerIp.isBlank()) ? envServerIp : sysServerIp;
-        this.templateId = (envTemplateId != null && !envTemplateId.isBlank()) ? envTemplateId : sysTemplateId;
-        this.serverUrl = (envServerUrl != null && !envServerUrl.isBlank()) ? envServerUrl : sysServerUrl;
-
-        if (this.baseUrl == null || this.apiUser == null || this.apiPass == null) {
-            throw new IllegalStateException(
-                    "Missing credentials: define BASE_URL, API_USER and API_PASSWORD in .env or environment variables.");
+        this.config = new LinkedHashMap<>();
+        for (String name : List.of(VAR_BASE_URL, VAR_API_USER, VAR_API_PASSWORD, VAR_SERVER_IP, VAR_TEMPLATE_ID,
+                VAR_SERVER_URL)) {
+            String fromFile = dotenv.get(name);
+            String fromEnv = System.getenv(name);
+            String value = (fromFile != null && !fromFile.isBlank()) ? fromFile : fromEnv;
+            this.config.put(name, (value == null || value.isBlank()) ? null : value.trim());
         }
+
+        this.baseUrl = this.config.get(VAR_BASE_URL);
+        this.apiUser = this.config.get(VAR_API_USER);
+        this.apiPass = this.config.get(VAR_API_PASSWORD);
+        this.serverIp = this.config.get(VAR_SERVER_IP);
+        this.templateId = this.config.get(VAR_TEMPLATE_ID);
+        this.serverUrl = this.config.get(VAR_SERVER_URL);
+
+        this.requireConfig(VAR_BASE_URL, VAR_API_USER, VAR_API_PASSWORD);
+    }
+
+    /**
+     * Fails fast when any of the named configuration variables is missing.
+     *
+     * <p>
+     * Every missing variable is reported at once so a misconfigured environment
+     * does not have to be fixed one variable per run.
+     * </p>
+     *
+     * @param varNames the configuration variable names that the caller depends on
+     * @throws IllegalStateException if at least one of them is not configured
+     */
+    public void requireConfig(String... varNames) {
+        List<String> missing = new ArrayList<>();
+
+        for (String varName : varNames) {
+            String value = this.config.get(varName);
+            if (value == null || value.isBlank()) {
+                missing.add(varName);
+            }
+        }
+
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException("Missing configuration: define "
+                    + String.join(", ", missing)
+                    + " in .env or as an environment variable.");
+        }
+    }
+
+    /**
+     * Validates the variables needed to reach the Vicidial admin web pages.
+     *
+     * @throws IllegalStateException if SERVER_URL is not configured
+     */
+    private void requireServerUrl() {
+        this.requireConfig(VAR_SERVER_URL);
+    }
+
+    /**
+     * Returns the configured admin page URL for a given Vicidial ADD code.
+     *
+     * @param addCode the Vicidial admin page code (e.g. "1300" for the DID list)
+     * @return the full URL of the requested admin page
+     * @throws IllegalStateException if SERVER_URL is not configured
+     */
+    public String adminPageUrl(String addCode) {
+        this.requireServerUrl();
+        return this.serverUrl + "?ADD=" + addCode;
+    }
+
+    /**
+     * Validates the variables needed to create users and phones.
+     *
+     * @throws IllegalStateException if SERVER_IP or TEMPLATE_ID is not configured
+     */
+    public void requirePhoneConfig() {
+        this.requireConfig(VAR_SERVER_IP, VAR_TEMPLATE_ID);
     }
 
     /**
@@ -349,6 +407,8 @@ public class VicidialClientSingleton {
      * @throws InterruptedException When the thread is interrupted while waiting.
      */
     public void updatePhone(String ID, String password) throws IOException, InterruptedException {
+        this.requireConfig(VAR_SERVER_IP);
+
         // Build the URL
         String phoneUrl = buildApiUrl("update_phone") +
                 "&extension=" + ID +
@@ -403,12 +463,7 @@ public class VicidialClientSingleton {
      * @throws InterruptedException When the thread is interrupted while waiting.
      */
     public void createPhone(String ID, String password) throws IOException, InterruptedException {
-        if (this.serverIp == null || this.serverIp.isBlank()) {
-            throw new IOException("Missing configuration: define SERVER_IP in .env or as an environment variable.");
-        }
-        if (this.templateId == null || this.templateId.isBlank()) {
-            throw new IOException("Missing configuration: define TEMPLATE_ID in .env or as an environment variable.");
-        }
+        this.requirePhoneConfig();
 
         String cid = "0000000000";
         String phoneURL = buildApiUrl("add_phone") +
@@ -476,6 +531,8 @@ public class VicidialClientSingleton {
      * @throws InterruptedException If the thread is interrupted while waiting.
      */
     public void removeDID(int id) throws IOException, InterruptedException {
+        this.requireServerUrl();
+
         String originalInput = apiUser + ":" + apiPass;
         Base64.Encoder encoder = Base64.getEncoder();
         String encodedString = encoder.encodeToString(originalInput.getBytes(StandardCharsets.UTF_8));
@@ -533,6 +590,8 @@ public class VicidialClientSingleton {
      *                              exists
      */
     public String createUserGroup(String groupName, String description) throws IOException, InterruptedException {
+        this.requireServerUrl();
+
         // 1. Configure the client with cookie management to maintain the PHPSESSID
         // session
         CookieManager cookieManager = new CookieManager();
@@ -603,6 +662,7 @@ public class VicidialClientSingleton {
      * @throws InterruptedException if the operation is interrupted
      */
     public List<UserGroupModel> listUserGroups() throws IOException, InterruptedException {
+        this.requireServerUrl();
 
         List<UserGroupModel> groups = new ArrayList<>();
         String auth = Base64.getEncoder().encodeToString((apiUser + ":" + apiPass).getBytes(StandardCharsets.UTF_8));
@@ -682,6 +742,7 @@ public class VicidialClientSingleton {
      *                              exists
      */
     public String createCIDGroup(String CidName, String cidDescription) throws IOException, InterruptedException {
+        this.requireServerUrl();
 
         // 1. Configure the client with cookie management to maintain the PHPSESSID
         // session
@@ -764,6 +825,7 @@ public class VicidialClientSingleton {
         if (groupID.isEmpty()) {
             groupID = "---ALL---";
         }
+        this.requireServerUrl();
 
         // 1. Configure the client with cookie management to maintain the PHPSESSID
         // session
@@ -852,9 +914,7 @@ public class VicidialClientSingleton {
      *                              the response
      */
     public List<ListModel> getAllLists() throws IOException, InterruptedException {
-        String LIST_URL = "https://cloud.yourserviceva.net/vicidial/admin.php?ADD=100";
-
-        String response = this.getFromWeb(LIST_URL);
+        String response = this.getFromWeb(this.adminPageUrl("100"));
         List<ListModel> lists = new ArrayList<>();
         Document doc = Jsoup.parse(response);
 
@@ -970,6 +1030,8 @@ public class VicidialClientSingleton {
      * @throws InterruptedException if the operation is interrupted
      */
     public String copyExistingCampaign(CampaignBuildInfo campaignInfo) throws IOException, InterruptedException {
+        this.requireServerUrl();
+
         final String FORM_CODE_SIMULATE_FORM = "12"; // form page ADD code (simulate opening the form)
         final String FORM_CODE_SIMULATE_ACTION = "20"; // action ADD code (form action for copying campaign)
         final String FORM_CODE_SIMULATE_PERMISSION = "193111111111"; // permission ADD code (adds permissions to view
