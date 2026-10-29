@@ -7,17 +7,24 @@ import picocli.CommandLine.Model.CommandSpec;
 
 import java.util.concurrent.Callable;
 
-import dev.pablo.api.CampaignsCommand;
+import dev.pablo.api.campaign.CampaignCommand;
 import dev.pablo.api.LeadDetailCommand;
 import dev.pablo.api.DuplicateLeadCommand;
 import dev.pablo.api.UpdateCredCommand;
 import dev.pablo.api.CreatCredentialCommand;
-import dev.pablo.api.DIDsCommand;
 import dev.pablo.api.VicidialClientSingleton;
+import dev.pablo.api.did.DidCommand;
 
 @Command(name = "vicidial-cli", mixinStandardHelpOptions = true,
     version = "Vicidial CLI 1.0", description = "Command-line tool for the Vicidial API.")
 public class MainApplication implements Callable<Integer> {
+
+    /**
+     * Allows subcommand names in any case, so {@code did LIST} and {@code did list}
+     * both work.
+     */
+    private static final boolean SUBCOMMANDS_CASE_INSENSITIVE = true;
+
     @CommandLine.Spec
     CommandSpec spec;
 
@@ -29,12 +36,16 @@ public class MainApplication implements Callable<Integer> {
         }
 
         CommandLine commandLine = new CommandLine(new MainApplication())
-                .addSubcommand("campaign", CampaignsCommand.class)
+                .addSubcommand("campaign", CampaignCommand.class)
                 .addSubcommand("leadDetails", LeadDetailCommand.class)
                 .addSubcommand("duplicateInList", DuplicateLeadCommand.class)
                 .addSubcommand("createCreds", CreatCredentialCommand.class)
                 .addSubcommand("updateCred", UpdateCredCommand.class)
-                .addSubcommand("deleteDIDs", DIDsCommand.class);
+                .addSubcommand("did", DidCommand.class);
+
+        // Set after the subcommands are registered: picocli only propagates the
+        // setting to the subcommands that exist at the time of the call.
+        commandLine.setSubcommandsCaseInsensitive(SUBCOMMANDS_CASE_INSENSITIVE);
 
         System.exit(commandLine.execute(args));
     }

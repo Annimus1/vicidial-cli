@@ -67,11 +67,11 @@ variable at once. Requirements per command:
 
 | Command | Required variables |
 |---------|--------------------|
-| `campaign INFO`, `campaign PAUSE`, `campaign ACTIVE` | BASE_URL, API_USER, API_PASSWORD |
-| `campaign CREATE` | the three above + SERVER_URL, plus SERVER_IP and TEMPLATE_ID when `-n` is used |
+| `campaign list`, `campaign info`, `campaign pause`, `campaign active` | BASE_URL, API_USER, API_PASSWORD |
+| `campaign create` | the three above + SERVER_URL, plus SERVER_IP and TEMPLATE_ID when `--users` is used |
 | `createCreds` | BASE_URL, API_USER, API_PASSWORD, SERVER_IP, TEMPLATE_ID |
 | `updateCred` | BASE_URL, API_USER, API_PASSWORD, plus SERVER_IP when a password is given |
-| `deleteDIDs` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
+| `did list`, `did verify`, `did remove` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
 | `leadDetails`, `duplicateInList` | BASE_URL, API_USER, API_PASSWORD |
 
 Examples
@@ -115,8 +115,21 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
   - Usage: `vicidial-cli duplicateInList <leadId> <listId> [-c|--comments "<notes>"] [-e|--email <email>]`
   - Example: `vicidial-cli duplicateInList 12345 10 -c "Transfer to new list" -e new@example.com`
 
-- ### getAllCampaigns — list campaigns.
-  - Usage: `vicidial-cli getAllCampaigns`
+- ### campaign — work with the campaigns stored on the instance.
+  - Subcommands:
+    - `campaign list` — show every campaign
+    - `campaign info [--id ID]` — show one campaign, or list every campaign when no id is given
+    - `campaign create --id ID --description DESC [--users N] [--password PASS]` — create the campaign, its user/CID/inbound groups, list and optional agent users
+    - `campaign pause --id ID` — set a campaign to inactive
+    - `campaign active --id ID` — set a campaign to active
+  - Subcommand names are case-insensitive, so `campaign LIST` also works.
+  - Examples:
+    - `vicidial-cli campaign list`
+    - `vicidial-cli campaign info --id SALES`
+    - `vicidial-cli campaign create --id SALES --description "Sales campaign"`
+    - `vicidial-cli campaign create --id SALES --description "Sales campaign" --users 5 --password secret`
+    - `vicidial-cli campaign pause --id SALES`
+    - `vicidial-cli campaign active --id SALES`
 
 - ### leadDetails — fetch full lead info.
   - Usage (CLI varies by implementation): `vicidial-cli leadDetails --leadId <ID>`
@@ -125,20 +138,29 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
   - Usage: `vicidial-cli updateCred <ID> [-n|--name "<displayName>"] [-p|--password <newPassword>]`
   - Example: `vicidial-cli updateCred agent001 -n "John Doe" -p N3wP@ss`
 
-- ### deleteDIDs — delete DIDs from Vicidial admin page.
-  - Modes:
-    - SINGLE: remove a single DID by exact number (`--did`)
-    - MULTIPLE: remove DIDs listed in a newline-separated file (`-l` / `--list`)
-    - GROUP: planned — remove by usergroup (not fully implemented)
+- ### did — work with the DIDs stored on the instance.
+  - Subcommands:
+    - `did list` — show the DIDs on the instance, with `--active`, `--inactive`, `--group`, `--carrier` filters, or DID numbers as positional arguments
+    - `did verify <number>` — check that a DID exists and show its group, route, carrier and description; exits `1` when it is not on the instance
+    - `did remove` — remove DIDs, selected with exactly one of `--did`, `--file` or `--group`; supports `--dry-run` and `--force`; add `--cid <group>` to also remove each outbound caller id from a CID group (`--areacode`, `--state` or `--all` control the entry areacode)
+    - `did add` — add one DID (`--did`) or a file of DIDs (`--file`) to an inbound group (`--inbound`/`-i`) and a CID group (`--cid`/`-c`); the CID entry drops the leading `1`, uses `areacode=NONE` by default and supports `--areacode`, `--state` or `--all`. Add `--dry-run` to preview.
+  - Subcommand names are case-insensitive, so `did LIST` also works.
   - DID format validation: must start with `1` and be 11 digits (e.g. `15551234567`).
+  - A bulk removal asks for confirmation; `--force` skips it, `--dry-run` previews without changing anything.
   - Examples:
-    - Single DID: `vicidial-cli deleteDIDs -m SINGLE --did 15551234567`
-    - Multiple (file): `vicidial-cli deleteDIDs -m MULTIPLE -l /path/to/dids.txt`
+    - `vicidial-cli did list`
+    - `vicidial-cli did verify 15551234567`
+    - `vicidial-cli did remove --did 15551234567`
+    - `vicidial-cli did remove --file /path/to/dids.txt`
+    - `vicidial-cli did remove --group SALES_TEAM --dry-run`
+    - `vicidial-cli did remove --did 15551234567 --cid SALES_CID`
+    - `vicidial-cli did add --did 11231234321 --inbound SALES --cid SALESCID`
+    - `vicidial-cli did add --file /path/to/dids.txt --inbound SALES --cid SALESCID --state FL`
 
 ## Examples
 
 - List campaigns:
-  `vicidial-cli getAllCampaigns`
+  `vicidial-cli campaign list`
 
 - Lead details:
   `vicidial-cli leadDetails --leadId 12345`

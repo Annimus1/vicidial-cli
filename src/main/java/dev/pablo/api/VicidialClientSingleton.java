@@ -552,6 +552,98 @@ public class VicidialClientSingleton {
     }
 
     /**
+     * Adds an inbound DID through the Non-Agent API and routes it to an inbound
+     * group.
+     *
+     * <p>
+     * Calls {@code add_did} with {@code did_route=IN_GROUP}. The API user needs
+     * user level 8 or higher with "Modify DIDs" enabled.
+     * </p>
+     *
+     * @param didPattern   the DID number to add
+     * @param inboundGroup the inbound group that should receive calls
+     * @param description  optional DID description, omitted when blank
+     * @return the raw API response body
+     * @throws IOException          if a network or I/O error occurs
+     * @throws InterruptedException if the operation is interrupted
+     */
+    public String addDidToInboundGroup(String didPattern, String inboundGroup, String description)
+            throws IOException, InterruptedException {
+
+        StringBuilder url = new StringBuilder(buildApiUrl("add_did"))
+                .append("&did_pattern=").append(safeEncode(didPattern))
+                .append("&did_route=IN_GROUP")
+                .append("&group=").append(safeEncode(inboundGroup))
+                .append("&active=Y");
+
+        if (description != null && !description.isBlank()) {
+            url.append("&did_description=").append(safeEncode(description));
+        }
+
+        return executeApiCall(url.toString());
+    }
+
+    /**
+     * Adds an entry to a CID Group through the Non-Agent API.
+     *
+     * <p>
+     * Calls {@code update_cid_group_entry} with {@code stage=ADD}. The API user
+     * needs user level 8 or higher with "Modify Campaigns" enabled.
+     * </p>
+     *
+     * @param cidGroupId   the CID Group ID or Campaign ID
+     * @param areacode     the areacode, state code, NONE or ---ALL---
+     * @param outboundCid  the outbound caller id, without the leading 1
+     * @param description  optional description, omitted when blank
+     * @param active       'Y' or 'N'
+     * @return the raw API response body
+     * @throws IOException          if a network or I/O error occurs
+     * @throws InterruptedException if the operation is interrupted
+     */
+    public String addCidGroupEntry(String cidGroupId, String areacode, String outboundCid, String description,
+            String active) throws IOException, InterruptedException {
+
+        StringBuilder url = new StringBuilder(buildApiUrl("update_cid_group_entry"))
+                .append("&stage=ADD")
+                .append("&cid_group_id=").append(safeEncode(cidGroupId))
+                .append("&areacode=").append(safeEncode(areacode))
+                .append("&outbound_cid=").append(safeEncode(outboundCid))
+                .append("&active=").append(safeEncode(active));
+
+        if (description != null && !description.isBlank()) {
+            url.append("&cid_description=").append(safeEncode(description));
+        }
+
+        return executeApiCall(url.toString());
+    }
+
+    /**
+     * Removes an entry from a CID Group through the Non-Agent API.
+     *
+     * <p>
+     * Calls {@code update_cid_group_entry} with {@code stage=DELETE}.
+     * </p>
+     *
+     * @param cidGroupId  the CID Group ID or Campaign ID
+     * @param areacode    the areacode, state code, NONE or ---ALL---
+     * @param outboundCid the outbound caller id, without the leading 1
+     * @return the raw API response body
+     * @throws IOException          if a network or I/O error occurs
+     * @throws InterruptedException if the operation is interrupted
+     */
+    public String removeCidGroupEntry(String cidGroupId, String areacode, String outboundCid)
+            throws IOException, InterruptedException {
+
+        String url = buildApiUrl("update_cid_group_entry")
+                + "&stage=DELETE"
+                + "&cid_group_id=" + safeEncode(cidGroupId)
+                + "&areacode=" + safeEncode(areacode)
+                + "&outbound_cid=" + safeEncode(outboundCid);
+
+        return executeApiCall(url);
+    }
+
+    /**
      * Update the campaign's active status using the Non-Agent API.
      *
      * @param campaignId the campaign identifier
