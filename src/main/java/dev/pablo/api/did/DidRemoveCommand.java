@@ -10,6 +10,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
@@ -38,11 +39,19 @@ import picocli.CommandLine.Option;
     "A bulk removal asks for confirmation first. Use --dry-run to preview and",
     "--force to skip the prompt.",
     "",
+    "Also remove the outbound caller id from a CID group:",
+    "  --cid <group>      CID group to clean up",
+    "  --areacode <value> NONE (default), areacode, state or ---ALL---",
+    "  --state <XX>       state code to use as the areacode",
+    "  --all              use ---ALL--- as the areacode",
+    "",
     "Examples:",
     "  vicidial-cli did remove --did 15551234567",
     "  vicidial-cli did remove --file /path/to/dids.txt",
     "  vicidial-cli did remove --group SALES_TEAM --dry-run",
-    "  vicidial-cli did remove --group SALES_TEAM --force"
+    "  vicidial-cli did remove --group SALES_TEAM --force",
+    "  vicidial-cli did remove --did 15551234567 --cid SALES_CID",
+    "  vicidial-cli did remove --file /path/to/dids.txt --cid SALES_CID --state FL"
 }, mixinStandardHelpOptions = true)
 public class DidRemoveCommand implements Callable<Integer> {
 
@@ -57,6 +66,21 @@ public class DidRemoveCommand implements Callable<Integer> {
     @Option(names = { "-g",
         "--group" }, description = "Remove every DID assigned to this user group.", defaultValue = "")
     private String group;
+
+    @Option(names = { "-c",
+        "--cid" }, description = "Also remove each DID from this CID group.", defaultValue = "")
+    private String cidGroup;
+
+    @Option(names = { "--areacode" }, description = "CID group areacode, a state code, NONE or ---ALL---.",
+        defaultValue = "")
+    private String areacode;
+
+    @Option(names = { "--state" }, description = "State code to use as the CID group areacode, e.g. FL.",
+        defaultValue = "")
+    private String state;
+
+    @Option(names = { "--all" }, description = "Use ---ALL--- as the CID group areacode.", defaultValue = "false")
+    private boolean allAreacodes;
 
     @Option(names = { "--dry-run" }, description = "Show what would be removed without changing anything.", defaultValue = "false")
     private boolean dryRun;
@@ -98,6 +122,20 @@ public class DidRemoveCommand implements Callable<Integer> {
             return 1;
         }
 
+        String resolvedAreacode = "";
+
+        if (!cidGroup.isBlank()) {
+            try {
+                resolvedAreacode = DidRepository.resolveAreacode(areacode, state, allAreacodes);
+            } catch (IllegalArgumentException e) {
+                System.err.println(Ansi.AUTO.text("❌ @|red " + e.getMessage() + " |@"));
+                return 1;
+            }
+        } else if (!areacode.isBlank() || !state.isBlank() || allAreacodes) {
+            System.err.println(Ansi.AUTO.text("❌ @|red --areacode, --state and --all require --cid. |@"));
+            return 1;
+        }
+
         List<DidModel> dids = repository.fetchAll();
         List<DidModel> targets;
 
@@ -115,6 +153,11 @@ public class DidRemoveCommand implements Callable<Integer> {
 
         warnAboutProtected(targets);
 
+        if (!cidGroup.isBlank()) {
+            System.out.println(Ansi.AUTO.text("@|blue Also removing from CID group '" + cidGroup.trim()
+                    + "' (areacode=" + resolvedAreacode + "). |@"));
+        }
+
         DidTable.print(targets, dryRun ? "Would remove" : "Removing");
 
         if (dryRun) {
@@ -127,7 +170,7 @@ public class DidRemoveCommand implements Callable<Integer> {
             return 1;
         }
 
-        return removeAll(targets);
+        return removeAll(targets, resolvedAreacode);
     }
 
     /**
@@ -282,14 +325,15 @@ public class DidRemoveCommand implements Callable<Integer> {
     /**
      * Removes each DID, reporting failures without stopping the run.
      *
-     * @param targets the DIDs to remove
+     * @param targets  the DIDs to remove
+     * @param areacode the resolved CID group areacode
      * @return 0 when every removal succeeded, 1 when any failed
      */
-    private int removeAll(List<DidModel> targets) {
+    private int removeAll(List<DidModel> targets, String areacode) {
         int failed = 0;
 
         for (DidModel did : targets) {
-            if (removeOne(did)) {
+            if (!removeOne(did, areacode)) {
                 failed++;
             }
         }
@@ -308,28 +352,106 @@ public class DidRemoveCommand implements Callable<Integer> {
     /**
      * Removes a single DID, protecting the seeded default.
      *
-     * @param did the DID to remove
-     * @return true when the removal failed
+     * <p>
+     * When a CID group was given, the outbound caller id is removed from it
+     * before the inbound DID, so the DID is not left dialable after removal.
+     * </p>
+     *
+     * @param did      the DID to remove
+     * @param areacode the resolved CID group areacode
+     * @return true when the removal succeeded
      */
-    private boolean removeOne(DidModel did) {
+    private boolean removeOne(DidModel did, String areacode) {
         if (did.getId() == DidRepository.PROTECTED_DID_ID) {
             System.out.println(Ansi.AUTO.text("@|red Skipped ID " + did.getId()
                     + ", the default DID cannot be removed. |@"));
-            return false;
+            return true;
+        }
+
+        boolean ok = true;
+
+        if (!cidGroup.isBlank()) {
+            ok = removeCidEntry(did, areacode);
         }
 
         try {
             repository.remove(did.getId());
             System.out.println(Ansi.AUTO.text("@|green ✅ ID: " + did.getId() + " DID: "
                     + DidRepository.callerIdOrDash(did) + " removed. |@"));
-            return false;
         } catch (IOException e) {
             System.err.println(Ansi.AUTO.text("❌ @|red I/O error removing DID ID: " + did.getId() + " |@"));
-            return true;
+            ok = false;
         } catch (InterruptedException e) {
             System.err.println(Ansi.AUTO.text("❌ @|red Removal interrupted for DID ID: " + did.getId() + " |@"));
             Thread.currentThread().interrupt();
-            return true;
+            ok = false;
         }
+
+        return ok;
+    }
+
+    /**
+     * Removes the DID's outbound caller id from the selected CID group.
+     *
+     * @param did      the DID whose outbound caller id should be removed
+     * @param areacode the resolved CID group areacode
+     * @return true when the CID entry was removed or already absent
+     */
+    private boolean removeCidEntry(DidModel did, String areacode) {
+        String callerId = did.getCallerId();
+
+        if (callerId == null || callerId.isBlank()) {
+            System.err.println(Ansi.AUTO.text("⚠️ @|yellow Skipped CID cleanup for ID " + did.getId()
+                    + ", the caller id was not parsed. |@"));
+            return false;
+        }
+
+        String outboundCid = DidRepository.cidNumber(callerId);
+
+        try {
+            String response = repository.removeCidGroupEntry(cidGroup.trim(), areacode, outboundCid);
+
+            if (isCidRemoved(response)) {
+                System.out.println(Ansi.AUTO.text("@|green ✅|@ CID " + outboundCid + " removed from "
+                        + cidGroup.trim() + " (areacode=" + areacode + ")"));
+                return true;
+            }
+
+            System.err.println(Ansi.AUTO.text("⚠️ @|yellow CID " + outboundCid + " was not removed from "
+                    + cidGroup.trim() + ": " + responseMessage(response) + " |@"));
+            return false;
+        } catch (IOException e) {
+            System.err.println(Ansi.AUTO.text("⚠️ @|yellow I/O error removing CID " + outboundCid + ": "
+                    + e.getMessage() + " |@"));
+            return false;
+        } catch (InterruptedException e) {
+            System.err.println(Ansi.AUTO.text("⚠️ @|yellow CID removal interrupted for " + outboundCid + " |@"));
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private static boolean isCidRemoved(String response) {
+        if (response == null || response.isBlank()) {
+            return false;
+        }
+
+        String upper = response.trim().toUpperCase(Locale.ROOT);
+
+        return upper.startsWith("SUCCESS") || upper.contains("HAS NO ENTRIES");
+    }
+
+    private static String responseMessage(String response) {
+        if (response == null || response.isBlank()) {
+            return "empty response";
+        }
+
+        for (String line : response.split("\\R")) {
+            if (!line.isBlank()) {
+                return line.trim();
+            }
+        }
+
+        return response.trim();
     }
 }

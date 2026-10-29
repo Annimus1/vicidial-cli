@@ -47,8 +47,6 @@ import picocli.CommandLine.Option;
 }, mixinStandardHelpOptions = true)
 public class DidAddCommand implements Callable<Integer> {
 
-    private static final String DEFAULT_AREACODE = "NONE";
-
     @Option(names = { "-d",
         "--did" }, description = "A single DID to add. Must start with '1' and be 11 digits.", defaultValue = "")
     private String did;
@@ -134,7 +132,7 @@ public class DidAddCommand implements Callable<Integer> {
         String resolvedAreacode;
 
         try {
-            resolvedAreacode = resolveAreacode();
+            resolvedAreacode = DidRepository.resolveAreacode(areacode, state, allAreacodes);
         } catch (IllegalArgumentException e) {
             System.err.println(Ansi.AUTO.text("❌ @|red " + e.getMessage() + " |@"));
             return 1;
@@ -185,49 +183,6 @@ public class DidAddCommand implements Callable<Integer> {
         System.err.println(Ansi.AUTO.text("❌ @|red " + failed + " of " + dids.size()
                 + " DID(s) could not be fully added. |@"));
         return 1;
-    }
-
-    /**
-     * Resolves the areacode sent with the CID group entry.
-     *
-     * @return the areacode, state code or special value
-     */
-    private String resolveAreacode() {
-        int selected = 0;
-
-        if (!areacode.isBlank()) {
-            selected++;
-        }
-        if (!state.isBlank()) {
-            selected++;
-        }
-        if (allAreacodes) {
-            selected++;
-        }
-
-        if (selected > 1) {
-            throw new IllegalArgumentException("--areacode, --state and --all cannot be combined.");
-        }
-
-        if (allAreacodes) {
-            return "---ALL---";
-        }
-
-        if (!state.isBlank()) {
-            String value = state.trim();
-
-            if (!value.matches("[A-Za-z]{2}")) {
-                throw new IllegalArgumentException("--state must be a two-letter state code.");
-            }
-
-            return value.toUpperCase(Locale.ROOT);
-        }
-
-        if (!areacode.isBlank()) {
-            return areacode.trim();
-        }
-
-        return DEFAULT_AREACODE;
     }
 
     /**
@@ -296,7 +251,7 @@ public class DidAddCommand implements Callable<Integer> {
     private void printPlan(List<String> dids, String areacode) {
         for (String number : dids) {
             System.out.println("  " + number + " -> inbound " + inboundGroup.trim()
-                    + " | CID " + cidGroup.trim() + " outbound_cid=" + cidNumber(number)
+                    + " | CID " + cidGroup.trim() + " outbound_cid=" + DidRepository.cidNumber(number)
                     + " areacode=" + areacode);
         }
     }
@@ -321,7 +276,7 @@ public class DidAddCommand implements Callable<Integer> {
 
             System.out.println(Ansi.AUTO.text("@|green ✅|@ inbound " + number + " -> " + inboundGroup.trim()));
 
-            String outboundCid = cidNumber(number);
+            String outboundCid = DidRepository.cidNumber(number);
             String cidResponse = client.addCidGroupEntry(cidGroup.trim(), areacode, outboundCid,
                     description.trim(), "Y");
 
@@ -345,16 +300,6 @@ public class DidAddCommand implements Callable<Integer> {
             Thread.currentThread().interrupt();
             return false;
         }
-    }
-
-    /**
-     * Removes the leading {@code 1} used by the inbound DID format.
-     *
-     * @param number the 11-digit DID
-     * @return the 10-digit outbound caller id
-     */
-    static String cidNumber(String number) {
-        return number.startsWith("1") ? number.substring(1) : number;
     }
 
     private static boolean isSuccess(String response) {

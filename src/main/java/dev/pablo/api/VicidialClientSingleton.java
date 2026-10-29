@@ -618,6 +618,32 @@ public class VicidialClientSingleton {
     }
 
     /**
+     * Removes an entry from a CID Group through the Non-Agent API.
+     *
+     * <p>
+     * Calls {@code update_cid_group_entry} with {@code stage=DELETE}.
+     * </p>
+     *
+     * @param cidGroupId  the CID Group ID or Campaign ID
+     * @param areacode    the areacode, state code, NONE or ---ALL---
+     * @param outboundCid the outbound caller id, without the leading 1
+     * @return the raw API response body
+     * @throws IOException          if a network or I/O error occurs
+     * @throws InterruptedException if the operation is interrupted
+     */
+    public String removeCidGroupEntry(String cidGroupId, String areacode, String outboundCid)
+            throws IOException, InterruptedException {
+
+        String url = buildApiUrl("update_cid_group_entry")
+                + "&stage=DELETE"
+                + "&cid_group_id=" + safeEncode(cidGroupId)
+                + "&areacode=" + safeEncode(areacode)
+                + "&outbound_cid=" + safeEncode(outboundCid);
+
+        return executeApiCall(url);
+    }
+
+    /**
      * Update the campaign's active status using the Non-Agent API.
      *
      * @param campaignId the campaign identifier

@@ -52,6 +52,21 @@ public class DidRepository {
     }
 
     /**
+     * Removes a DID from a CID Group.
+     *
+     * @param cidGroupId  the CID Group ID or Campaign ID
+     * @param areacode    the areacode, state code, NONE or ---ALL---
+     * @param outboundCid the outbound caller id, without the leading 1
+     * @return the raw API response body
+     * @throws IOException          if the API cannot be reached
+     * @throws InterruptedException if the thread is interrupted while waiting
+     */
+    public String removeCidGroupEntry(String cidGroupId, String areacode, String outboundCid)
+            throws IOException, InterruptedException {
+        return client.removeCidGroupEntry(cidGroupId, areacode, outboundCid);
+    }
+
+    /**
      * Fetches and parses every DID stored on the instance.
      *
      * @return the parsed DIDs, never null
@@ -110,6 +125,69 @@ public class DidRepository {
         }
 
         return "Invalid DID '" + trimmed + "'.";
+    }
+
+    /**
+     * Resolves the areacode sent with a CID Group entry.
+     *
+     * @param areacode     raw areacode, NONE or ---ALL---
+     * @param state        two-letter state code
+     * @param allAreacodes true to use ---ALL---
+     * @return the areacode, state code or special value
+     * @throws IllegalArgumentException if more than one selector is set or the
+     *                                  state is malformed
+     */
+    public static String resolveAreacode(String areacode, String state, boolean allAreacodes) {
+        int selected = 0;
+
+        if (areacode != null && !areacode.isBlank()) {
+            selected++;
+        }
+        if (state != null && !state.isBlank()) {
+            selected++;
+        }
+        if (allAreacodes) {
+            selected++;
+        }
+
+        if (selected > 1) {
+            throw new IllegalArgumentException("--areacode, --state and --all cannot be combined.");
+        }
+
+        if (allAreacodes) {
+            return "---ALL---";
+        }
+
+        if (state != null && !state.isBlank()) {
+            String value = state.trim();
+
+            if (!value.matches("[A-Za-z]{2}")) {
+                throw new IllegalArgumentException("--state must be a two-letter state code.");
+            }
+
+            return value.toUpperCase(Locale.ROOT);
+        }
+
+        if (areacode != null && !areacode.isBlank()) {
+            return areacode.trim();
+        }
+
+        return "NONE";
+    }
+
+    /**
+     * Removes the leading {@code 1} used by the inbound DID format.
+     *
+     * @param did the 11-digit DID
+     * @return the outbound caller id expected by the CID Group API
+     */
+    public static String cidNumber(String did) {
+        if (did == null) {
+            return "";
+        }
+
+        String trimmed = did.trim();
+        return trimmed.startsWith("1") ? trimmed.substring(1) : trimmed;
     }
 
     /**
