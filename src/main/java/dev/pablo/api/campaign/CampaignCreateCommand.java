@@ -1,166 +1,107 @@
-package dev.pablo.api;
+package dev.pablo.api.campaign;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import dev.pablo.api.VicidialClientSingleton;
 import dev.pablo.models.CampaignBuildInfo;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Ansi;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 
-@Command(name = "campaign", description = "Gets and displays the list of active/inactive campaigns from Vicidial.", mixinStandardHelpOptions = true)
-public class CampaignsCommand implements Callable<Integer> {
+/**
+ * Builds a campaign and the objects it depends on.
+ *
+ * <p>
+ * Subcommand of {@code campaign}. Creates the user group, CID group, inbound
+ * group, campaign, list and optional agent users in the same order as before.
+ * </p>
+ */
+@Command(name = "create", description = {
+    "Create a campaign and the groups, list and users it needs.",
+    "",
+    "Examples:",
+    "  vicidial-cli campaign create --id SALES --description \"Sales campaign\"",
+    "  vicidial-cli campaign create --id SALES --description \"Sales campaign\" --users 5 --password secret"
+}, mixinStandardHelpOptions = true)
+public class CampaignCreateCommand implements Callable<Integer> {
 
     private static final String STEP_SEPARATOR =
             "----------------------------------------------------------";
 
     private final VicidialClientSingleton client;
 
-    @Parameters(index = "0", description = "Command to perform the action.\n"
-            + "INFO - It provides information on each campaign available in the Vicidial system.\n"
-            + "CREATE - Create a campaign in the Vicidial system from scratch, create the user group, the list, the inbound group, and the users with their respective phone.\n"
-            + "PAUSE - Change the status of a specific campaign to \"PAUSED\" in the Vicidial system\n"
-            + "ACTIVE - Change the status of a specific campaign to \"ACTIVE\" in the Vicidial system.\n\n"
-            + "USAGE\n"
-            + "campaign INFO -id [campaignId] \n"
-            + "campaign PAUSE -id [campaignId]\n"
-            + "campaign ACTIVE -id [campaignId]\n"
-            + "campaign CREATE -id [campaignId] -D [description] -n [numberOfUsers] -p [password]")
-    private String command;
-
-    @Option(names = { "-id", "--campaign_id" }, description = ". (optional)", defaultValue = "")
+    @Option(names = { "-id",
+        "--campaign_id", "--id" }, description = "Campaign identifier.",
+        defaultValue = "")
     private String campaign_ID;
 
-    @Option(names = { "-D", "--description" }, description = "", defaultValue = "")
+    @Option(names = { "-D",
+        "--description", "--desc" }, description = "Campaign description.",
+        defaultValue = "")
     private String campaignDescription;
 
-    @Option(names = { "-n", "--users" }, description = "Number of agent users (with their phones) to create for the campaign.", defaultValue = "0")
+    @Option(names = { "-n",
+        "--users" }, description = "Number of agent users (with their phones) to create for the campaign.",
+        defaultValue = "0")
     private int userCount;
 
-    @Option(names = { "-p", "--password" }, description = "Shared password for the created agent users.", defaultValue = "")
+    @Option(names = { "-p",
+        "--password" }, description = "Shared password for the created agent users.",
+        defaultValue = "")
     private String userPassword;
 
-    public CampaignsCommand() {
-        this.client = VicidialClientSingleton.getInstance();
+    public CampaignCreateCommand() {
+        this(VicidialClientSingleton.getInstance());
+    }
+
+    CampaignCreateCommand(VicidialClientSingleton client) {
+        this.client = client;
     }
 
     @Override
     public Integer call() {
-
-        try {
-            // INFO
-            if (command.toLowerCase().equals("info")) {
-                getCampaign_Info();
-            }
-
-            // CREATE
-            else if (command.toLowerCase().equals("create")) {
-                
-                // Campaign ID
-                if(this.campaign_ID.isBlank()){
-                    System.err.println(Ansi.AUTO.text("❌ @|red Campaign ID is missing. |@"));
-                    return 1;
-                }
-                else if(this.campaign_ID.length() <= 4){
-                    System.err.println(Ansi.AUTO.text("❌ @|red Campaign ID should be greater than 4 characters. |@"));
-                    return 1;
-                } 
-
-                // Campaign description
-                else if (this.campaignDescription.isBlank()) {
-                    System.err.println(Ansi.AUTO.text("❌ @|red Campaign Description is missing. |@"));
-                    return 1;
-                } 
-                else if (this.campaignDescription.length() <= 4) {
-                    System.err.println(Ansi.AUTO.text("❌ @|red Description should be greater than 4 characters. |@"));
-                    return 1;
-                } 
-
-                // Users
-                else if (this.userCount < 0) {
-                    System.err.println(Ansi.AUTO.text("❌ @|red Number of users should be zero or greater. |@"));
-                    return 1;
-                }
-                else if (this.userCount > 0 && this.userPassword.isBlank()) {
-                    System.err.println(Ansi.AUTO.text("❌ @|red A password is required to create " + this.userCount + " user(s). |@"));
-                    return 1;
-                }
-
-                // Configuration required by the creation chain, checked before any
-                // object is created so a missing variable cannot leave a partial
-                // campaign behind.
-                else if (!checkCreateConfig()) {
-                    return 1;
-                }
-
-                // Create Camp
-                else {
-                    return createCampaign() ? 0 : 1;
-                }
-            }
-
-            // PAUSE
-            else if (command.toLowerCase().equals("pause")) {
-                if (!campaign_ID.isBlank()) {
-                    System.out.println(Ansi.AUTO.text("@|blue Preparing for update Campaign...|@"));
-                    client.updateCampaignStatus(campaign_ID, "N");
-                } else {
-                    System.err.println(
-                            Ansi.AUTO.text("❌ @|red Parameter \"Campaign_Id\" is missing. |@ "));
-                    return 1;
-                }
-            }
-
-            // ACTIVE
-            else if (command.toLowerCase().equals("active")) {
-                if (!campaign_ID.isBlank()) {
-                    System.out.println(Ansi.AUTO.text("@|blue Preparing for update Campaign...|@"));
-                    client.updateCampaignStatus(campaign_ID, "Y");
-                } else {
-                    System.err.println(
-                            Ansi.AUTO.text("❌ @|red Parameter \"Campaign_Id\" is missing. |@ "));
-                    return 1;
-                }
-            }
-
-            // DEFAULT (argument unknown)
-            else {
-                System.err.println(Ansi.AUTO.text("❌ @|red Argument " + command + " unknown. |@ "));
-                System.err.println(Ansi.AUTO.text("🧐 @|yellow Try campaign -h to get information. |@ "));
-                return 1;
-            }
-
-            return 0; // Success
-
-        } catch (IOException e) {
-            System.err.println(Ansi.AUTO.text("❌ @|red API or network error:|@ " + e.getMessage()));
-            return 1; // Error
-        } catch (InterruptedException e) {
-            System.err.println(Ansi.AUTO.text("❌ @|red The request was interrupted.|@"));
-            Thread.currentThread().interrupt();
+        if (this.campaign_ID.isBlank()) {
+            System.err.println(Ansi.AUTO.text("❌ @|red Campaign ID is missing. |@"));
             return 1;
         }
-    }
 
-    public void getCampaign_Info() throws IOException, InterruptedException {
-        System.out.println(Ansi.AUTO.text("@|yellow Searching campaigns...|@"));
-
-        String formattedResult = client.getCampaigns();
-
-        System.out.println(Ansi.AUTO.text("\n@|blue Campaigns list's obtained:|@"));
-        System.out.println("---------------------------------------------------------");
-        String[] rows = formattedResult.split("\\R");
-
-        for (String row : rows) {
-            String[] segments = row.split("\\|");
-            String active = segments[2].equalsIgnoreCase("y") ? "✅" : "❌";
-
-            System.out.println(active + " ID: " + segments[0] + " | Description: " + segments[1]);
+        if (this.campaign_ID.length() <= 4) {
+            System.err.println(Ansi.AUTO.text("❌ @|red Campaign ID should be greater than 4 characters. |@"));
+            return 1;
         }
-        System.out.println("---------------------------------------------------------");
+
+        if (this.campaignDescription.isBlank()) {
+            System.err.println(Ansi.AUTO.text("❌ @|red Campaign Description is missing. |@"));
+            return 1;
+        }
+
+        if (this.campaignDescription.length() <= 4) {
+            System.err.println(Ansi.AUTO.text("❌ @|red Description should be greater than 4 characters. |@"));
+            return 1;
+        }
+
+        if (this.userCount < 0) {
+            System.err.println(Ansi.AUTO.text("❌ @|red Number of users should be zero or greater. |@"));
+            return 1;
+        }
+
+        if (this.userCount > 0 && this.userPassword.isBlank()) {
+            System.err.println(Ansi.AUTO
+                    .text("❌ @|red A password is required to create " + this.userCount + " user(s). |@"));
+            return 1;
+        }
+
+        // Configuration required by the creation chain, checked before any
+        // object is created so a missing variable cannot leave a partial
+        // campaign behind.
+        if (!checkCreateConfig()) {
+            return 1;
+        }
+
+        return createCampaign() ? 0 : 1;
     }
 
     public boolean createCampaign() {
@@ -283,7 +224,7 @@ public class CampaignsCommand implements Callable<Integer> {
     }
 
     /**
-     * Verifies that the configuration needed by the CREATE chain is present.
+     * Verifies that the configuration needed by the create chain is present.
      *
      * <p>
      * The user group, CID group, inbound group and list steps go through the admin

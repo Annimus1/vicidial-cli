@@ -67,8 +67,8 @@ variable at once. Requirements per command:
 
 | Command | Required variables |
 |---------|--------------------|
-| `campaign INFO`, `campaign PAUSE`, `campaign ACTIVE` | BASE_URL, API_USER, API_PASSWORD |
-| `campaign CREATE` | the three above + SERVER_URL, plus SERVER_IP and TEMPLATE_ID when `-n` is used |
+| `campaign list`, `campaign info`, `campaign pause`, `campaign active` | BASE_URL, API_USER, API_PASSWORD |
+| `campaign create` | the three above + SERVER_URL, plus SERVER_IP and TEMPLATE_ID when `--users` is used |
 | `createCreds` | BASE_URL, API_USER, API_PASSWORD, SERVER_IP, TEMPLATE_ID |
 | `updateCred` | BASE_URL, API_USER, API_PASSWORD, plus SERVER_IP when a password is given |
 | `did list`, `did verify`, `did remove` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
@@ -115,8 +115,21 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
   - Usage: `vicidial-cli duplicateInList <leadId> <listId> [-c|--comments "<notes>"] [-e|--email <email>]`
   - Example: `vicidial-cli duplicateInList 12345 10 -c "Transfer to new list" -e new@example.com`
 
-- ### getAllCampaigns — list campaigns.
-  - Usage: `vicidial-cli getAllCampaigns`
+- ### campaign — work with the campaigns stored on the instance.
+  - Subcommands:
+    - `campaign list` — show every campaign
+    - `campaign info [--id ID]` — show one campaign, or list every campaign when no id is given
+    - `campaign create --id ID --description DESC [--users N] [--password PASS]` — create the campaign, its user/CID/inbound groups, list and optional agent users
+    - `campaign pause --id ID` — set a campaign to inactive
+    - `campaign active --id ID` — set a campaign to active
+  - Subcommand names are case-insensitive, so `campaign LIST` also works.
+  - Examples:
+    - `vicidial-cli campaign list`
+    - `vicidial-cli campaign info --id SALES`
+    - `vicidial-cli campaign create --id SALES --description "Sales campaign"`
+    - `vicidial-cli campaign create --id SALES --description "Sales campaign" --users 5 --password secret`
+    - `vicidial-cli campaign pause --id SALES`
+    - `vicidial-cli campaign active --id SALES`
 
 - ### leadDetails — fetch full lead info.
   - Usage (CLI varies by implementation): `vicidial-cli leadDetails --leadId <ID>`
@@ -144,7 +157,7 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
 ## Examples
 
 - List campaigns:
-  `vicidial-cli getAllCampaigns`
+  `vicidial-cli campaign list`
 
 - Lead details:
   `vicidial-cli leadDetails --leadId 12345`

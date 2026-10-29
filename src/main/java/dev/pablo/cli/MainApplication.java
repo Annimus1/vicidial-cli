@@ -7,7 +7,7 @@ import picocli.CommandLine.Model.CommandSpec;
 
 import java.util.concurrent.Callable;
 
-import dev.pablo.api.CampaignsCommand;
+import dev.pablo.api.campaign.CampaignCommand;
 import dev.pablo.api.LeadDetailCommand;
 import dev.pablo.api.DuplicateLeadCommand;
 import dev.pablo.api.UpdateCredCommand;
@@ -36,7 +36,7 @@ public class MainApplication implements Callable<Integer> {
         }
 
         CommandLine commandLine = new CommandLine(new MainApplication())
-                .addSubcommand("campaign", CampaignsCommand.class)
+                .addSubcommand("campaign", CampaignCommand.class)
                 .addSubcommand("leadDetails", LeadDetailCommand.class)
                 .addSubcommand("duplicateInList", DuplicateLeadCommand.class)
                 .addSubcommand("createCreds", CreatCredentialCommand.class)
