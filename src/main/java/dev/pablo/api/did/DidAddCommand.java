@@ -1,138 +1,377 @@
 package dev.pablo.api.did;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
-import dev.pablo.models.DidModel;
+import dev.pablo.api.VicidialClientSingleton;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Ansi;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 
 /**
- * Adds DIDs to a Vicidial instance.
+ * Adds DIDs to an inbound group and to a CID group.
  *
  * <p>
- * NOT IMPLEMENTED. The CLI surface below is the agreed contract; the admin form
- * that creates a DID has not been mapped yet, so calling this reports that the
- * command is unavailable rather than pretending to work.
- * </p>
- *
- * <p>
- * Intended behaviour once implemented:
- * </p>
- * <ol>
- * <li>Validate the number with the same format rule used by {@code verify} and
- * {@code remove}.</li>
- * <li>Reject a number already on the instance, reported by {@code did verify}.</li>
- * <li>Submit the admin add-DID form, one call per DID.</li>
- * <li>Read the instance back and confirm each DID was stored, since a success
- * response alone does not prove it.</li>
- * <li>Report a per-DID summary and exit {@code 1} if any DID failed.</li>
- * </ol>
- *
- * <p>
- * The open questions are the admin form field names and ADD codes, which the
- * Vicidial API does not expose.
+ * Subcommand of {@code did}. Each DID follows the same flow: it is created in
+ * {@code vicidial_inbound_dids} and routed to the inbound group first, then an
+ * entry is added to {@code vicidial_campaign_cid_areacodes} with the leading
+ * {@code 1} removed from the outbound caller id.
  * </p>
  */
 @Command(name = "add", description = {
-    "Add DIDs to the instance. (not implemented yet)",
+    "Add DIDs to an inbound group and a CID group.",
     "",
-    "The CLI contract below is settled, but the Vicidial admin form that creates",
-    "a DID has not been mapped yet, so this subcommand reports that it is",
-    "unavailable instead of running.",
+    "Each DID is added to the inbound group first, then to the CID group with",
+    "the leading 1 removed from the outbound caller id.",
     "",
-    "Intended options:",
-    "  <number>...       one or more DID numbers, each starting with '1' and 11 digits",
-    "  -g, --group       user group to assign the DIDs to",
-    "  -c, --carrier     carrier to record on the DIDs",
-    "  -d, --description description to record on the DIDs",
+    "Select DIDs with exactly one of:",
+    "  --did <number>     a single DID in US format (11 digits, starts with 1)",
+    "  --file <path>      one DID per line",
     "",
-    "Example:",
-    "  vicidial-cli did add 15551234567 --group SALES_TEAM"
+    "The CID entry uses areacode=NONE by default. Use --areacode, --state or",
+    "--all to override it.",
+    "",
+    "Examples:",
+    "  vicidial-cli did add --did 11231234321 --inbound SALES --cid SALESCID",
+    "  vicidial-cli did add --file /path/to/dids.txt --inbound SALES --cid SALESCID",
+    "  vicidial-cli did add --did 11231234321 --inbound SALES --cid SALESCID --state FL",
+    "  vicidial-cli did add --did 11231234321 --inbound SALES --cid SALESCID --all"
 }, mixinStandardHelpOptions = true)
 public class DidAddCommand implements Callable<Integer> {
 
-    @Parameters(description = "DID numbers to add. Each must start with '1' and be 11 digits.")
-    private List<String> dids;
-
-    @Option(names = { "-g",
-        "--group" }, description = "User group to assign the DIDs to.", defaultValue = "")
-    private String group;
-
-    @Option(names = { "-c",
-        "--carrier" }, description = "Carrier to record on the DIDs.", defaultValue = "")
-    private String carrier;
+    private static final String DEFAULT_AREACODE = "NONE";
 
     @Option(names = { "-d",
-        "--description" }, description = "Description to record on the DIDs.", defaultValue = "")
+        "--did" }, description = "A single DID to add. Must start with '1' and be 11 digits.", defaultValue = "")
+    private String did;
+
+    @Option(names = { "-f",
+        "--file" }, description = "Path to a file with one DID per line.", defaultValue = "")
+    private String file;
+
+    @Option(names = { "-i",
+        "--inbound" }, description = "Inbound group that should receive calls for the DIDs.", defaultValue = "")
+    private String inboundGroup;
+
+    @Option(names = { "-c",
+        "--cid" }, description = "CID group (or campaign id) that should receive the outbound caller ids.",
+        defaultValue = "")
+    private String cidGroup;
+
+    @Option(names = { "--description" }, description = "Optional description, 6 to 50 characters.",
+        defaultValue = "")
     private String description;
 
+    @Option(names = { "--areacode" }, description = "CID group areacode, a state code, NONE or ---ALL---.",
+        defaultValue = "")
+    private String areacode;
+
+    @Option(names = { "--state" }, description = "State code to use as the CID group areacode, e.g. FL.",
+        defaultValue = "")
+    private String state;
+
+    @Option(names = { "--all" }, description = "Use ---ALL--- as the CID group areacode.", defaultValue = "false")
+    private boolean allAreacodes;
+
+    @Option(names = { "--dry-run" }, description = "Show what would be added without changing anything.",
+        defaultValue = "false")
+    private boolean dryRun;
+
+    private final VicidialClientSingleton client;
+
+    public DidAddCommand() {
+        this(VicidialClientSingleton.getInstance());
+    }
+
+    DidAddCommand(VicidialClientSingleton client) {
+        this.client = client;
+    }
+
     @Override
-    public Integer call() {
-        System.err.println(Ansi.AUTO.text("❌ @|red did add is not implemented yet. |@"));
-        System.err.println(Ansi.AUTO.text("🧐 @|yellow Available subcommands: list, verify, remove. |@"));
+    public Integer call() throws Exception {
+        int selectors = 0;
 
-        if (dids != null && !dids.isEmpty()) {
-            System.err.println(Ansi.AUTO.text("   @|yellow would have added: " + String.join(", ", dids) + " |@"));
+        if (!did.isBlank()) {
+            selectors++;
+        }
+        if (!file.isBlank()) {
+            selectors++;
         }
 
-        if (!group.isBlank()) {
-            System.err.println(Ansi.AUTO.text("   @|yellow would have used group: " + group.trim() + " |@"));
+        if (selectors == 0) {
+            System.err.println(Ansi.AUTO.text("❌ @|red Provide one of --did or --file. |@"));
+            return 1;
         }
 
-        if (!carrier.isBlank()) {
-            System.err.println(Ansi.AUTO.text("   @|yellow would have used carrier: " + carrier.trim() + " |@"));
+        if (selectors > 1) {
+            System.err.println(Ansi.AUTO.text("❌ @|red --did and --file cannot be combined. |@"));
+            return 1;
         }
 
-        if (!description.isBlank()) {
-            System.err.println(Ansi.AUTO.text("   @|yellow would have used description: " + description.trim() + " |@"));
+        if (inboundGroup.isBlank()) {
+            System.err.println(Ansi.AUTO.text("❌ @|red --inbound is required. |@"));
+            return 1;
         }
 
+        if (cidGroup.isBlank()) {
+            System.err.println(Ansi.AUTO.text("❌ @|red --cid is required. |@"));
+            return 1;
+        }
+
+        if (!description.isBlank() && (description.trim().length() < 6 || description.trim().length() > 50)) {
+            System.err.println(Ansi.AUTO.text("❌ @|red --description must be between 6 and 50 characters. |@"));
+            return 1;
+        }
+
+        String resolvedAreacode;
+
+        try {
+            resolvedAreacode = resolveAreacode();
+        } catch (IllegalArgumentException e) {
+            System.err.println(Ansi.AUTO.text("❌ @|red " + e.getMessage() + " |@"));
+            return 1;
+        }
+
+        List<String> dids;
+
+        try {
+            dids = resolveDids();
+        } catch (IllegalArgumentException e) {
+            System.err.println(Ansi.AUTO.text("❌ @|red " + e.getMessage() + " |@"));
+            return 1;
+        } catch (IOException e) {
+            System.err.println(Ansi.AUTO.text("❌ @|red " + e.getMessage() + " |@"));
+            return 1;
+        }
+
+        if (dids.isEmpty()) {
+            System.err.println(Ansi.AUTO.text("❌ @|red No valid DIDs to add. |@"));
+            return 1;
+        }
+
+        System.out.println(Ansi.AUTO.text("@|blue Adding " + dids.size() + " DID(s) to inbound group '"
+                + inboundGroup.trim() + "' and CID group '" + cidGroup.trim() + "' (areacode="
+                + resolvedAreacode + "). |@"));
+
+        if (dryRun) {
+            printPlan(dids, resolvedAreacode);
+            System.out.println(Ansi.AUTO.text("@|yellow Dry run, nothing was added. |@"));
+            return 0;
+        }
+
+        int failed = 0;
+
+        for (String number : dids) {
+            if (!addOne(number, resolvedAreacode)) {
+                failed++;
+            }
+        }
+
+        System.out.println();
+
+        if (failed == 0) {
+            System.out.println(Ansi.AUTO.text("@|green ✅ Added " + dids.size() + " DID(s). |@"));
+            return 0;
+        }
+
+        System.err.println(Ansi.AUTO.text("❌ @|red " + failed + " of " + dids.size()
+                + " DID(s) could not be fully added. |@"));
         return 1;
     }
 
     /**
-     * Validates the requested numbers against the same rule used by the other
-     * subcommands.
+     * Resolves the areacode sent with the CID group entry.
      *
-     * <p>
-     * Kept next to the stub so the contract is executable as soon as the admin
-     * form is mapped, and so a caller can rely on one format rule across the whole
-     * command.
-     * </p>
-     *
-     * @return the numbers that are well formed
+     * @return the areacode, state code or special value
      */
-    List<String> validateFormat() {
-        return dids == null
-                ? List.of()
-                : dids.stream().filter(DidRepository::isValidFormat).toList();
+    private String resolveAreacode() {
+        int selected = 0;
+
+        if (!areacode.isBlank()) {
+            selected++;
+        }
+        if (!state.isBlank()) {
+            selected++;
+        }
+        if (allAreacodes) {
+            selected++;
+        }
+
+        if (selected > 1) {
+            throw new IllegalArgumentException("--areacode, --state and --all cannot be combined.");
+        }
+
+        if (allAreacodes) {
+            return "---ALL---";
+        }
+
+        if (!state.isBlank()) {
+            String value = state.trim();
+
+            if (!value.matches("[A-Za-z]{2}")) {
+                throw new IllegalArgumentException("--state must be a two-letter state code.");
+            }
+
+            return value.toUpperCase(Locale.ROOT);
+        }
+
+        if (!areacode.isBlank()) {
+            return areacode.trim();
+        }
+
+        return DEFAULT_AREACODE;
     }
 
     /**
-     * Reports which of the requested numbers are already on the instance.
+     * Resolves the DID selector into the numbers to add.
      *
-     * <p>
-     * Defined but not called: it needs the instance lookup, which is only worth
-     * doing once a DID can actually be created.
-     * </p>
-     *
-     * @param existing the DIDs currently on the instance
-     * @return the requested numbers that already exist
-     * @throws IOException          if the instance cannot be read
-     * @throws InterruptedException if the thread is interrupted while waiting
+     * @return the DIDs to add, empty when the selector matched nothing
+     * @throws IOException if the file named by {@code --file} cannot be read
      */
-    List<DidModel> findExisting(List<DidModel> existing) throws IOException, InterruptedException {
-        if (dids == null) {
-            return List.of();
+    private List<String> resolveDids() throws IOException {
+        if (!did.isBlank()) {
+            String candidate = did.trim();
+
+            if (!DidRepository.isValidFormat(candidate)) {
+                throw new IllegalArgumentException(DidRepository.formatError(candidate));
+            }
+
+            return List.of(candidate);
         }
 
-        return dids.stream()
-                .map(callerId -> DidRepository.findByCallerId(existing, callerId))
-                .filter(did -> did != null)
-                .toList();
+        return readFile(Paths.get(file.trim()));
+    }
+
+    /**
+     * Reads and validates the DIDs listed in a file.
+     *
+     * <p>
+     * Invalid lines are reported and skipped so one bad entry does not abort a
+     * bulk add.
+     * </p>
+     *
+     * @param path the file to read
+     * @return the unique, well-formed DIDs
+     * @throws IOException if the file cannot be read
+     */
+    private List<String> readFile(Path path) throws IOException {
+        if (!Files.exists(path) || !Files.isRegularFile(path)) {
+            throw new IOException("Invalid path: " + path.toAbsolutePath());
+        }
+
+        Set<String> unique = new LinkedHashSet<>();
+
+        for (String line : Files.readAllLines(path)) {
+            String candidate = line.trim();
+
+            if (candidate.isEmpty() || candidate.startsWith("#")) {
+                continue;
+            }
+
+            if (!DidRepository.isValidFormat(candidate)) {
+                System.err.println(Ansi.AUTO.text("⚠️ @|yellow Skipped invalid DID: " + candidate + " |@"));
+                continue;
+            }
+
+            unique.add(candidate);
+        }
+
+        return new ArrayList<>(unique);
+    }
+
+    /**
+     * Prints what would be sent without calling the API.
+     *
+     * @param dids      the DIDs that would be added
+     * @param areacode  the resolved areacode
+     */
+    private void printPlan(List<String> dids, String areacode) {
+        for (String number : dids) {
+            System.out.println("  " + number + " -> inbound " + inboundGroup.trim()
+                    + " | CID " + cidGroup.trim() + " outbound_cid=" + cidNumber(number)
+                    + " areacode=" + areacode);
+        }
+    }
+
+    /**
+     * Adds one DID to the inbound group and then to the CID group.
+     *
+     * @param number    the inbound DID number
+     * @param areacode  the resolved CID group areacode
+     * @return true when both steps succeeded
+     */
+    private boolean addOne(String number, String areacode) {
+        try {
+            String inboundResponse = client.addDidToInboundGroup(number, inboundGroup.trim(), description.trim());
+
+            if (!isSuccess(inboundResponse)) {
+                System.err.println(Ansi.AUTO.text("❌ @|red DID " + number
+                        + " was not added to inbound group '" + inboundGroup.trim() + "': "
+                        + responseMessage(inboundResponse) + " |@"));
+                return false;
+            }
+
+            System.out.println(Ansi.AUTO.text("@|green ✅|@ inbound " + number + " -> " + inboundGroup.trim()));
+
+            String outboundCid = cidNumber(number);
+            String cidResponse = client.addCidGroupEntry(cidGroup.trim(), areacode, outboundCid,
+                    description.trim(), "Y");
+
+            if (!isSuccess(cidResponse)) {
+                System.err.println(Ansi.AUTO.text("⚠️ @|yellow DID " + number
+                        + " was added to the inbound group, but the CID entry failed: "
+                        + responseMessage(cidResponse) + " |@"));
+                return false;
+            }
+
+            System.out.println(Ansi.AUTO.text("@|green ✅|@ CID " + outboundCid + " -> " + cidGroup.trim()
+                    + " (areacode=" + areacode + ")"));
+            return true;
+
+        } catch (IOException e) {
+            System.err.println(Ansi.AUTO.text("❌ @|red I/O error adding DID " + number + ": "
+                    + e.getMessage() + " |@"));
+            return false;
+        } catch (InterruptedException e) {
+            System.err.println(Ansi.AUTO.text("❌ @|red Add interrupted for DID " + number + " |@"));
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    /**
+     * Removes the leading {@code 1} used by the inbound DID format.
+     *
+     * @param number the 11-digit DID
+     * @return the 10-digit outbound caller id
+     */
+    static String cidNumber(String number) {
+        return number.startsWith("1") ? number.substring(1) : number;
+    }
+
+    private static boolean isSuccess(String response) {
+        return response != null && response.trim().toUpperCase(Locale.ROOT).startsWith("SUCCESS");
+    }
+
+    private static String responseMessage(String response) {
+        if (response == null || response.isBlank()) {
+            return "empty response";
+        }
+
+        for (String line : response.split("\\R")) {
+            if (!line.isBlank()) {
+                return line.trim();
+            }
+        }
+
+        return response.trim();
     }
 }

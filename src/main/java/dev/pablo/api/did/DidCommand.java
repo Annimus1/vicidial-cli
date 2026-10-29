@@ -21,13 +21,14 @@ import picocli.CommandLine.Model.CommandSpec;
     "  list     - show the DIDs on the instance",
     "  verify   - check that a DID exists and show what it is assigned to",
     "  remove   - remove one DID, a list of DIDs, or a whole group",
-    "  add      - add DIDs (not implemented yet)",
+    "  add      - add DIDs to an inbound group and a CID group",
     "",
     "Examples:",
     "  vicidial-cli did list",
     "  vicidial-cli did verify 15551234567",
     "  vicidial-cli did remove --did 15551234567",
-    "  vicidial-cli did remove --group SALES_TEAM --dry-run"
+    "  vicidial-cli did remove --group SALES_TEAM --dry-run",
+    "  vicidial-cli did add --did 11231234321 --inbound SALES --cid SALESCID"
 }, mixinStandardHelpOptions = true,
     subcommands = { DidListCommand.class, DidVerifyCommand.class, DidRemoveCommand.class, DidAddCommand.class })
 public class DidCommand implements Callable<Integer> {

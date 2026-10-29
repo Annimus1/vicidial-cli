@@ -143,7 +143,7 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
     - `did list` — show the DIDs on the instance, with `--active`, `--inactive`, `--group`, `--carrier` filters, or DID numbers as positional arguments
     - `did verify <number>` — check that a DID exists and show its group, route, carrier and description; exits `1` when it is not on the instance
     - `did remove` — remove DIDs, selected with exactly one of `--did`, `--file` or `--group`; supports `--dry-run` and `--force`
-    - `did add` — not implemented yet
+    - `did add` — add one DID (`--did`) or a file of DIDs (`--file`) to an inbound group (`--inbound`/`-i`) and a CID group (`--cid`/`-c`); the CID entry drops the leading `1`, uses `areacode=NONE` by default and supports `--areacode`, `--state` or `--all`. Add `--dry-run` to preview.
   - Subcommand names are case-insensitive, so `did LIST` also works.
   - DID format validation: must start with `1` and be 11 digits (e.g. `15551234567`).
   - A bulk removal asks for confirmation; `--force` skips it, `--dry-run` previews without changing anything.
@@ -153,6 +153,8 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
     - `vicidial-cli did remove --did 15551234567`
     - `vicidial-cli did remove --file /path/to/dids.txt`
     - `vicidial-cli did remove --group SALES_TEAM --dry-run`
+    - `vicidial-cli did add --did 11231234321 --inbound SALES --cid SALESCID`
+    - `vicidial-cli did add --file /path/to/dids.txt --inbound SALES --cid SALESCID --state FL`
 
 ## Examples
 
