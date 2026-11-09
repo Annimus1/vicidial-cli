@@ -76,7 +76,7 @@ variable at once. Requirements per command:
 | `did list`, `did verify`, `did remove` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
 | `list list` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
 | `list active`, `list pause`, `list move`, `list reset` | BASE_URL, API_USER, API_PASSWORD |
-| `leadDetails`, `duplicateInList` | BASE_URL, API_USER, API_PASSWORD |
+| `lead info`, `lead duplicate` | BASE_URL, API_USER, API_PASSWORD |
 
 Examples
 
@@ -129,10 +129,6 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
     - `vicidial-cli credential active --id agent001`
     - `vicidial-cli credential pause --id agent001`
 
-- ### duplicateInList — duplicate a lead into a list.
-  - Usage: `vicidial-cli duplicateInList <leadId> <listId> [-c|--comments "<notes>"] [-e|--email <email>]`
-  - Example: `vicidial-cli duplicateInList 12345 10 -c "Transfer to new list" -e new@example.com`
-
 - ### campaign — work with the campaigns stored on the instance.
   - Subcommands:
     - `campaign list` — show every campaign
@@ -149,8 +145,15 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
     - `vicidial-cli campaign pause --id SALES`
     - `vicidial-cli campaign active --id SALES`
 
-- ### leadDetails — fetch full lead info.
-  - Usage (CLI varies by implementation): `vicidial-cli leadDetails --leadId <ID>`
+- ### lead — work with the leads stored on the instance.
+  - Subcommands:
+    - `lead info --id ID` — show all information for one lead
+    - `lead duplicate --lead-id ID --list-id ID [-c|--comments "<notes>"] [-e|--email <email>]` — duplicate a lead into a list
+  - Subcommand names are case-insensitive, so `lead INFO` also works.
+  - Examples:
+    - `vicidial-cli lead info --id 1125`
+    - `vicidial-cli lead duplicate --lead-id 12345 --list-id 10`
+    - `vicidial-cli lead duplicate --lead-id 12345 --list-id 10 -c "Transfer to new list" -e new@example.com`
 
 - ### did — work with the DIDs stored on the instance.
   - Subcommands:
@@ -197,10 +200,10 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
   `vicidial-cli campaign list`
 
 - Lead details:
-  `vicidial-cli leadDetails --leadId 12345`
+  `vicidial-cli lead info --id 12345`
 
 - Duplicate lead into list:
-  `vicidial-cli duplicateInList 12345 678 -c "copied" -e "x@example.com"`
+  `vicidial-cli lead duplicate --lead-id 12345 --list-id 678 -c "copied" -e "x@example.com"`
 
 - Create credentials:
   `vicidial-cli credential create --id agent001 --password secret_pass --group SALES -n "Agent Name"`

@@ -8,11 +8,10 @@ import picocli.CommandLine.Model.CommandSpec;
 import java.util.concurrent.Callable;
 
 import dev.pablo.api.campaign.CampaignCommand;
-import dev.pablo.api.LeadDetailCommand;
-import dev.pablo.api.DuplicateLeadCommand;
 import dev.pablo.api.VicidialClientSingleton;
 import dev.pablo.api.credential.CredentialCommand;
 import dev.pablo.api.did.DidCommand;
+import dev.pablo.api.lead.LeadCommand;
 import dev.pablo.api.list.ListCommand;
 
 @Command(name = "vicidial-cli", mixinStandardHelpOptions = true,
@@ -37,8 +36,7 @@ public class MainApplication implements Callable<Integer> {
 
         CommandLine commandLine = new CommandLine(new MainApplication())
                 .addSubcommand("campaign", CampaignCommand.class)
-                .addSubcommand("leadDetails", LeadDetailCommand.class)
-                .addSubcommand("duplicateInList", DuplicateLeadCommand.class)
+                .addSubcommand("lead", LeadCommand.class)
                 .addSubcommand("credential", CredentialCommand.class)
                 .addSubcommand("did", DidCommand.class)
                 .addSubcommand("list", ListCommand.class);
