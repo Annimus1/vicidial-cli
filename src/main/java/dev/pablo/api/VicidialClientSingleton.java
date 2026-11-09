@@ -671,6 +671,34 @@ public class VicidialClientSingleton {
     }
 
     /**
+     * Updates a list through the Non-Agent API.
+     *
+     * <p>
+     * Calls {@code update_list} in the {@code vicidial_lists} table. The API user
+     * needs user level 8 or higher with "Modify Lists" enabled. The required
+     * {@code source} field is already supplied by {@link #buildApiUrl(String)}.
+     * </p>
+     *
+     * @param listId the list identifier, 2-14 digits
+     * @param fields editable or settings fields to send, e.g. {@code active=Y}
+     * @return the raw API response body
+     * @throws IOException          if a network or I/O error occurs
+     * @throws InterruptedException if the operation is interrupted
+     */
+    public String updateList(String listId, Map<String, String> fields) throws IOException, InterruptedException {
+        StringBuilder url = new StringBuilder(buildApiUrl("update_list"))
+                .append("&list_id=").append(safeEncode(listId));
+
+        if (fields != null) {
+            for (Map.Entry<String, String> field : fields.entrySet()) {
+                url.append("&").append(field.getKey()).append("=").append(safeEncode(field.getValue()));
+            }
+        }
+
+        return executeApiCall(url.toString());
+    }
+
+    /**
      * Create a new user group via the admin web UI by simulating form submission.
      *
      * @param groupName   the desired group identifier (will be lowercased and
