@@ -72,6 +72,8 @@ variable at once. Requirements per command:
 | `createCreds` | BASE_URL, API_USER, API_PASSWORD, SERVER_IP, TEMPLATE_ID |
 | `updateCred` | BASE_URL, API_USER, API_PASSWORD, plus SERVER_IP when a password is given |
 | `did list`, `did verify`, `did remove` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
+| `list list` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
+| `list active`, `list pause`, `list move`, `list reset` | BASE_URL, API_USER, API_PASSWORD |
 | `leadDetails`, `duplicateInList` | BASE_URL, API_USER, API_PASSWORD |
 
 Examples
@@ -156,6 +158,26 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
     - `vicidial-cli did remove --did 15551234567 --cid SALES_CID`
     - `vicidial-cli did add --did 11231234321 --inbound SALES --cid SALESCID`
     - `vicidial-cli did add --file /path/to/dids.txt --inbound SALES --cid SALESCID --state FL`
+
+- ### list — work with the lists stored on the instance.
+  - Subcommands:
+    - `list list` — show every list, with `--activeOnly`, `--inactiveOnly` and `--campaign` filters
+    - `list active --id ID` — set a list to active
+    - `list pause --id ID` — set a list to inactive
+    - `list move --campaignId CAMPAIGN --id LIST_ID` — move a list to a different campaign
+    - `list reset --id LIST_ID` — reset the called-since-last-reset flag for every lead in the list
+  - Subcommand names are case-insensitive, so `list LIST` also works.
+  - The `active`, `pause`, `move` and `reset` commands call the Non-Agent API
+    `update_list`; the API user needs user level 8 or higher with "Modify Lists"
+    enabled.
+  - Examples:
+    - `vicidial-cli list list`
+    - `vicidial-cli list list --activeOnly`
+    - `vicidial-cli list list --campaign SALES`
+    - `vicidial-cli list active --id 6004`
+    - `vicidial-cli list pause --id 6004`
+    - `vicidial-cli list move --campaignId SALES --id 6004`
+    - `vicidial-cli list reset --id 6004`
 
 ## Examples
 

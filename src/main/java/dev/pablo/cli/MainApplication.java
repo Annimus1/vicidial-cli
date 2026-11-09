@@ -14,6 +14,7 @@ import dev.pablo.api.UpdateCredCommand;
 import dev.pablo.api.CreatCredentialCommand;
 import dev.pablo.api.VicidialClientSingleton;
 import dev.pablo.api.did.DidCommand;
+import dev.pablo.api.list.ListCommand;
 
 @Command(name = "vicidial-cli", mixinStandardHelpOptions = true,
     version = "Vicidial CLI 1.0", description = "Command-line tool for the Vicidial API.")
@@ -41,7 +42,8 @@ public class MainApplication implements Callable<Integer> {
                 .addSubcommand("duplicateInList", DuplicateLeadCommand.class)
                 .addSubcommand("createCreds", CreatCredentialCommand.class)
                 .addSubcommand("updateCred", UpdateCredCommand.class)
-                .addSubcommand("did", DidCommand.class);
+                .addSubcommand("did", DidCommand.class)
+                .addSubcommand("list", ListCommand.class);
 
         // Set after the subcommands are registered: picocli only propagates the
         // setting to the subcommands that exist at the time of the call.
