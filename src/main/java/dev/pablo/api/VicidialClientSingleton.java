@@ -398,6 +398,71 @@ public class VicidialClientSingleton {
     }
 
     /**
+     * Sets the active status of a user through the Non-Agent API.
+     *
+     * <p>
+     * Calls {@code update_user} with the {@code active} field. The API user
+     * needs user level 8 or higher with "Modify Users" enabled.
+     * </p>
+     *
+     * @param ID     user identifier
+     * @param active 'Y' or 'N'
+     * @return the raw API response body
+     * @throws IOException          if a network or I/O error occurs
+     * @throws InterruptedException if the operation is interrupted
+     */
+    public String updateUserStatus(String ID, String active) throws IOException, InterruptedException {
+        String url = buildApiUrl("update_user")
+                + "&agent_user=" + safeEncode(ID)
+                + "&active=" + safeEncode(active);
+
+        return executeApiCall(url);
+    }
+
+    /**
+     * Lists users through the Non-Agent API.
+     *
+     * <p>
+     * Calls {@code users_list} and returns the default pipe-delimited response.
+     * The API user needs user level 7 or higher with "View Reports" enabled.
+     * </p>
+     *
+     * @param agentUser one user id, or blank for every user
+     * @return the raw API response body
+     * @throws IOException          if a network or I/O error occurs
+     * @throws InterruptedException if the operation is interrupted
+     */
+    public String getUsersList(String agentUser) throws IOException, InterruptedException {
+        StringBuilder url = new StringBuilder(buildApiUrl("users_list"));
+
+        if (agentUser != null && !agentUser.isBlank()) {
+            url.append("&agent_user=").append(safeEncode(agentUser.trim()));
+        }
+
+        return executeApiCall(url.toString());
+    }
+
+    /**
+     * Fetches one user through the Non-Agent API.
+     *
+     * <p>
+     * Calls {@code user_details}, the single-user function that predates
+     * {@code users_list} and is available on older builds.
+     * </p>
+     *
+     * @param agentUser the user identifier
+     * @return the raw API response body
+     * @throws IOException          if a network or I/O error occurs
+     * @throws InterruptedException if the operation is interrupted
+     */
+    public String getUserDetails(String agentUser) throws IOException, InterruptedException {
+        String url = buildApiUrl("user_details")
+                + "&agent_user=" + safeEncode(agentUser);
+
+        return executeApiCall(url);
+    }
+
+    /**
      * Updates the password of a Vicidial Phone.
      *
      * @param ID       Phone identifier.

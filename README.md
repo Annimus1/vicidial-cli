@@ -69,12 +69,14 @@ variable at once. Requirements per command:
 |---------|--------------------|
 | `campaign list`, `campaign info`, `campaign pause`, `campaign active` | BASE_URL, API_USER, API_PASSWORD |
 | `campaign create` | the three above + SERVER_URL, plus SERVER_IP and TEMPLATE_ID when `--users` is used |
-| `createCreds` | BASE_URL, API_USER, API_PASSWORD, SERVER_IP, TEMPLATE_ID |
-| `updateCred` | BASE_URL, API_USER, API_PASSWORD, plus SERVER_IP when a password is given |
+| `credential create` | BASE_URL, API_USER, API_PASSWORD, SERVER_IP, TEMPLATE_ID |
+| `credential modify` | BASE_URL, API_USER, API_PASSWORD, plus SERVER_IP when a password is given |
+| `credential list` | BASE_URL, API_USER, API_PASSWORD; SERVER_URL for the admin-page fallback |
+| `credential active`, `credential pause` | BASE_URL, API_USER, API_PASSWORD |
 | `did list`, `did verify`, `did remove` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
 | `list list` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
 | `list active`, `list pause`, `list move`, `list reset` | BASE_URL, API_USER, API_PASSWORD |
-| `leadDetails`, `duplicateInList` | BASE_URL, API_USER, API_PASSWORD |
+| `lead info`, `lead duplicate` | BASE_URL, API_USER, API_PASSWORD |
 
 Examples
 
@@ -109,13 +111,23 @@ BASE_URL="https://vicidial.example/api" API_USER="api_user" API_PASSWORD="supers
 
 All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for global help or `vicidial-cli <subcommand> --help` for details.
 
-- ### createCreds — create user + phone credentials.
-  - Usage: `vicidial-cli createCreds <ID> <password> <userGroupId> [-n|--name "<displayName>"]`
-  - Example: `vicidial-cli createCreds agent001 S3cr3t UG_DEFAULT -n "Agent One"`
-
-- ### duplicateInList — duplicate a lead into a list.
-  - Usage: `vicidial-cli duplicateInList <leadId> <listId> [-c|--comments "<notes>"] [-e|--email <email>]`
-  - Example: `vicidial-cli duplicateInList 12345 10 -c "Transfer to new list" -e new@example.com`
+- ### credential — work with the credentials (users and phones) on the instance.
+  - Subcommands:
+    - `credential create --id ID --password PASS --group GROUP [-n|--name "<displayName>"]` — create a credential with its user and phone
+    - `credential list [--id ID]` — show every user, or one user; falls back to `user_details` / the admin Users page (`ADD=0A`) on builds without `users_list`
+    - `credential modify --id ID [-n|--name "<displayName>"] [-p|--password <newPassword>]` — update a user's name and/or password
+    - `credential active --id ID` — set a user to active
+    - `credential pause --id ID` — set a user to inactive
+  - `credential list` hides users with a user level above 8.
+  - Subcommand names are case-insensitive, so `credential CREATE` also works.
+  - Examples:
+    - `vicidial-cli credential create --id agent001 --password S3cr3t --group UG_DEFAULT`
+    - `vicidial-cli credential create --id agent001 --password S3cr3t --group UG_DEFAULT -n "Agent One"`
+    - `vicidial-cli credential list`
+    - `vicidial-cli credential list --id agent001`
+    - `vicidial-cli credential modify --id agent001 -n "John Doe"`
+    - `vicidial-cli credential active --id agent001`
+    - `vicidial-cli credential pause --id agent001`
 
 - ### campaign — work with the campaigns stored on the instance.
   - Subcommands:
@@ -133,12 +145,15 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
     - `vicidial-cli campaign pause --id SALES`
     - `vicidial-cli campaign active --id SALES`
 
-- ### leadDetails — fetch full lead info.
-  - Usage (CLI varies by implementation): `vicidial-cli leadDetails --leadId <ID>`
-
-- ### updateCred — update user and phone credentials.
-  - Usage: `vicidial-cli updateCred <ID> [-n|--name "<displayName>"] [-p|--password <newPassword>]`
-  - Example: `vicidial-cli updateCred agent001 -n "John Doe" -p N3wP@ss`
+- ### lead — work with the leads stored on the instance.
+  - Subcommands:
+    - `lead info --id ID` — show all information for one lead
+    - `lead duplicate --lead-id ID --list-id ID [-c|--comments "<notes>"] [-e|--email <email>]` — duplicate a lead into a list
+  - Subcommand names are case-insensitive, so `lead INFO` also works.
+  - Examples:
+    - `vicidial-cli lead info --id 1125`
+    - `vicidial-cli lead duplicate --lead-id 12345 --list-id 10`
+    - `vicidial-cli lead duplicate --lead-id 12345 --list-id 10 -c "Transfer to new list" -e new@example.com`
 
 - ### did — work with the DIDs stored on the instance.
   - Subcommands:
@@ -185,16 +200,16 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
   `vicidial-cli campaign list`
 
 - Lead details:
-  `vicidial-cli leadDetails --leadId 12345`
+  `vicidial-cli lead info --id 12345`
 
 - Duplicate lead into list:
-  `vicidial-cli duplicateInList 12345 678 -c "copied" -e "x@example.com"`
+  `vicidial-cli lead duplicate --lead-id 12345 --list-id 678 -c "copied" -e "x@example.com"`
 
 - Create credentials:
-  `vicidial-cli createCreds agent001 secret_pass SALES -n "Agent Name"`
+  `vicidial-cli credential create --id agent001 --password secret_pass --group SALES -n "Agent Name"`
 
 - Update credential:
-  `vicidial-cli updateCred agent001 -n "New Name" -p newpass`
+  `vicidial-cli credential modify --id agent001 -n "New Name" -p newpass`
 
 ## Notes & Troubleshooting
 
