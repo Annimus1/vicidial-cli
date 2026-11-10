@@ -41,6 +41,28 @@ public class ListRepository {
     }
 
     /**
+     * Validates the configuration needed to read the admin list page.
+     *
+     * @throws IllegalStateException if SERVER_URL is not configured
+     */
+    public void requireServerUrl() {
+        client.requireConfig(VicidialClientSingleton.VAR_SERVER_URL);
+    }
+
+    /**
+     * Creates a list and attaches it to a campaign.
+     *
+     * @param listId          the list id, or null to use the next available id
+     * @param name            the list name
+     * @param description     the list description
+     * @param campaignId      the destination campaign
+     * @return the created list id, or null when creation failed
+     */
+    public String create(String listId, String name, String description, String campaignId) {
+        return client.createList(listId, name, description, campaignId);
+    }
+
+    /**
      * Sets the active status of a list.
      *
      * @param listId the list identifier, 2-14 digits

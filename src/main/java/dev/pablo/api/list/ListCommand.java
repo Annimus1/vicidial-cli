@@ -20,6 +20,7 @@ import picocli.CommandLine.Model.CommandSpec;
     "",
     "Subcommands:",
     "  list     - show the lists on the instance",
+    "  create   - create a list and attach it to a campaign",
     "  active   - set a list to active",
     "  pause    - set a list to inactive",
     "  move     - move a list to a different campaign",
@@ -29,13 +30,14 @@ import picocli.CommandLine.Model.CommandSpec;
     "  vicidial-cli list list",
     "  vicidial-cli list list --activeOnly",
     "  vicidial-cli list list --campaign SALES",
+    "  vicidial-cli list create --name SALES --desc \"Sales leads\" --campaign-id SALES",
     "  vicidial-cli list active --id 6004",
     "  vicidial-cli list pause --id 6004",
     "  vicidial-cli list move --campaignId SALES --id 6004",
     "  vicidial-cli list reset --id 6004"
 }, mixinStandardHelpOptions = true,
-    subcommands = { ListListCommand.class, ListActiveCommand.class, ListPauseCommand.class,
-        ListMoveCommand.class, ListResetCommand.class })
+    subcommands = { ListListCommand.class, ListCreateCommand.class, ListActiveCommand.class,
+        ListPauseCommand.class, ListMoveCommand.class, ListResetCommand.class })
 public class ListCommand implements Callable<Integer> {
 
     @CommandLine.Spec
