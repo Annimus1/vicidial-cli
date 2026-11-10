@@ -75,6 +75,7 @@ variable at once. Requirements per command:
 | `credential active`, `credential pause` | BASE_URL, API_USER, API_PASSWORD |
 | `did list`, `did verify`, `did remove` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
 | `list list` | BASE_URL, API_USER, API_PASSWORD, SERVER_URL |
+| `list create` | BASE_URL, API_USER, API_PASSWORD; SERVER_URL when `--id` is omitted |
 | `list active`, `list pause`, `list move`, `list reset` | BASE_URL, API_USER, API_PASSWORD |
 | `lead info`, `lead duplicate` | BASE_URL, API_USER, API_PASSWORD |
 
@@ -177,6 +178,7 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
 - ### list — work with the lists stored on the instance.
   - Subcommands:
     - `list list` — show every list, with `--activeOnly`, `--inactiveOnly` and `--campaign` filters
+    - `list create [--id ID] --name NAME --desc DESC --campaign-id CAMPAIGN` — create a list and attach it to a campaign; when `--id` is omitted the next available id is used
     - `list active --id ID` — set a list to active
     - `list pause --id ID` — set a list to inactive
     - `list move --campaignId CAMPAIGN --id LIST_ID` — move a list to a different campaign
@@ -189,6 +191,7 @@ All commands are subcommands of `vicidial-cli`. Run `vicidial-cli --help` for gl
     - `vicidial-cli list list`
     - `vicidial-cli list list --activeOnly`
     - `vicidial-cli list list --campaign SALES`
+    - `vicidial-cli list create --name SALES --desc "Sales leads" --campaign-id SALES`
     - `vicidial-cli list active --id 6004`
     - `vicidial-cli list pause --id 6004`
     - `vicidial-cli list move --campaignId SALES --id 6004`

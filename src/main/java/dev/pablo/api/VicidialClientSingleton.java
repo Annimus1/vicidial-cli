@@ -1193,9 +1193,12 @@ public class VicidialClientSingleton {
             if (response.contains("SUCCESS")) {
                 System.out
                         .println(Ansi.AUTO.text("@|green ✅ SUCCESS: add_list LIST HAS BEEN ADDED - " + listId + "|@"));
+                return listId;
             }
 
-            return listId;
+            System.out.println(
+                    Ansi.AUTO.text("@|red 🔴 ERROR: add_list LIST WAS NOT ADDED - " + listId + " |@"));
+            return null;
         } catch (Exception e) {
             // TODO: handle exception
             return null;
